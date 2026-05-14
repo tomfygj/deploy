@@ -1,388 +1,448 @@
-<style>
-    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;900&display=swap');
-    
-    * { margin: 0; padding: 0; box-sizing: border-box; }
-    
-    body { 
-        font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-        background: #07090C;
-        color: white;
-        overflow-x: hidden;
-        -webkit-tap-highlight-color: transparent;
-    }
+<!DOCTYPE html>
+<html lang="cs">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Francis Lifts - Fitness App</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/react@18/umd/react.development.js"></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;900&display=swap');
+        
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        
+        body { 
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+            background: #07090C;
+            color: white;
+            overflow-x: hidden;
+            -webkit-tap-highlight-color: transparent;
+        }
 
-    .scrollbar-hide::-webkit-scrollbar { display: none; }
-    .scrollbar-hide { -ms-overflow-style: none; scrollbar-width: none; }
-    
-    .gradient-text {
-        background: linear-gradient(135deg, #dc2626 0%, #f97316 100%);
-        -webkit-background-clip: text;
-        -webkit-text-fill-color: transparent;
-    }
+        .scrollbar-hide::-webkit-scrollbar { display: none; }
+        .scrollbar-hide { -ms-overflow-style: none; scrollbar-width: none; }
+        
+        .gradient-text {
+            background: linear-gradient(135deg, #dc2626 0%, #f97316 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
 
-    .glow-red {
-        box-shadow: 0 0 20px rgba(220, 38, 38, 0.2);
-    }
+        .glow-red {
+            box-shadow: 0 0 20px rgba(220, 38, 38, 0.3);
+        }
 
-    .card-enter {
-        animation: slideUp 0.3s ease-out forwards;
-    }
+        .card-enter {
+            animation: slideUp 0.3s ease-out forwards;
+        }
 
-    @keyframes slideUp {
-        from { opacity: 0; transform: translateY(10px); }
-        to { opacity: 1; transform: translateY(0); }
-    }
+        @keyframes slideUp {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
 
-    .tab-transition {
-        transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
-    }
+        .tab-transition {
+            transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+        }
 
-    input:focus {
-        border-color: #dc2626 !important;
-        outline: none;
-        box-shadow: 0 0 0 2px rgba(220, 38, 38, 0.2);
-    }
-</style>
+        input:focus {
+            border-color: #dc2626 !important;
+            outline: none;
+            box-shadow: 0 0 0 2px rgba(220, 38, 38, 0.2);
+        }
 
+        .calendar-day-active {
+            background: #dc2626;
+            color: white;
+            box-shadow: 0 0 10px rgba(220, 38, 38, 0.5);
+        }
+    </style>
+</head>
+<body>
+    <div id="app"></div>
 
-<script type="text/babel">
-    const { useState, useEffect, useRef, useMemo } = React;
+    <script type="text/babel">
+        const { useState, useEffect, useRef, useMemo } = React;
 
-    const Icon = ({ name, size = 20, className = "" }) => {
-        useEffect(() => {
-            if (window.lucide) window.lucide.createIcons();
-        }, [name]);
-        return <i data-lucide={name} className={className} style={{ width: size, height: size }}></i>;
-    };
-
-    function App() {
-        // Persistence - Načtení dat z localStorage
-        const [sets, setSets] = useState(() => {
-            const saved = localStorage.getItem('francis_sets');
-            return saved ? JSON.parse(saved) : [];
-        });
-        const [userWeight, setUserWeight] = useState(() => {
-            const saved = localStorage.getItem('francis_user_weight');
-            return saved ? parseFloat(saved) : 80;
-        });
-
-        const [activeTab, setActiveTab] = useState('diary');
-        const [newSet, setNewSet] = useState({ exercise: '', weight: '', reps: '' });
-        const [calcInput, setCalcInput] = useState({ weight: '', reps: '' });
-        const [chatMessages, setChatMessages] = useState([
-            { role: 'ai', text: 'Zdar! Jsem tvůj virtuální kouč. Potřebuješ poradit s technikou, tréninkem nebo stravou? 💪' }
-        ]);
-        const [userInput, setUserInput] = useState('');
-        const [isThinking, setIsThinking] = useState(false);
-        const chatEndRef = useRef(null);
-
-        // Ukládání při každé změně
-        useEffect(() => {
-            localStorage.setItem('francis_sets', JSON.stringify(sets));
-        }, [sets]);
-
-        useEffect(() => {
-            localStorage.setItem('francis_user_weight', userWeight.toString());
-        }, [userWeight]);
-
-        useEffect(() => {
-            chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-        }, [chatMessages, isThinking]);
-
-        const addSet = () => {
-            if (newSet.exercise && newSet.weight && newSet.reps) {
-                setSets([{ id: Date.now(), ...newSet, date: new Date().toISOString() }, ...sets]);
-                setNewSet({ ...newSet, weight: '', reps: '' }); 
-            }
+        const Icon = ({ name, size = 20, className = "" }) => {
+            useEffect(() => {
+                if (window.lucide) window.lucide.createIcons();
+            }, [name]);
+            return <i data-lucide={name} className={className} style={{ width: size, height: size }}></i>;
         };
 
-        const deleteSet = (id) => {
-            setSets(sets.filter(s => s.id !== id));
+        const TRAINING_PLAN = {
+            1: { name: "Pondělí", focus: "Záda / Biceps", icon: "dumbbell" },
+            2: { name: "Úterý", focus: "Nohy", icon: "activity" },
+            3: { name: "Středa", focus: "Hrudník / Ramena", icon: "zap" },
+            4: { name: "Čtvrtek", focus: "Záda", icon: "dumbbell" },
+            5: { name: "Pátek", focus: "Nohy", icon: "activity" },
+            6: { name: "Sobota", focus: "Rest Day", icon: "coffee" },
+            0: { name: "Neděle", focus: "Hrudník / Triceps", icon: "zap" }
         };
 
-        const clearAll = () => {
-            if (confirm('Opravdu chceš smazat všechnu historii?')) {
-                setSets([]);
-            }
-        };
-
-        const prs = useMemo(() => {
-            const bests = {};
-            sets.forEach(s => {
-                const weight = parseFloat(s.weight);
-                if (!bests[s.exercise] || weight > parseFloat(bests[s.exercise].weight)) {
-                    bests[s.exercise] = s;
-                }
+        function App() {
+            const [sets, setSets] = useState(() => {
+                const saved = localStorage.getItem('francis_sets');
+                return saved ? JSON.parse(saved) : [];
             });
-            return Object.values(bests);
-        }, [sets]);
+            const [userWeight, setUserWeight] = useState(() => {
+                const saved = localStorage.getItem('francis_user_weight');
+                return saved ? parseFloat(saved) : 80;
+            });
 
-        const totalVolume = useMemo(() => {
-            return sets.reduce((acc, s) => acc + (parseFloat(s.weight) * parseInt(s.reps)), 0);
-        }, [sets]);
+            const [activeTab, setActiveTab] = useState('diary');
+            const [newSet, setNewSet] = useState({ exercise: '', weight: '', reps: '' });
+            const [calcInput, setCalcInput] = useState({ weight: '', reps: '' });
+            const [chatMessages, setChatMessages] = useState([
+                { role: 'ai', text: 'Zdar! Jsem tvůj virtuální kouč. Potřebuješ poradit s technikou, tréninkem nebo stravou? 💪' }
+            ]);
+            const [userInput, setUserInput] = useState('');
+            const [isThinking, setIsThinking] = useState(false);
+            const chatEndRef = useRef(null);
 
-        const calculate1RM = (w, r) => {
-            if (!w || !r || r < 1) return null;
-            const weight = parseFloat(w);
-            const reps = parseInt(r);
-            return (weight * (1 + reps / 30)).toFixed(1); 
-        };
+            useEffect(() => {
+                localStorage.setItem('francis_sets', JSON.stringify(sets));
+            }, [sets]);
 
-        const getRank = (ex, w) => {
-            const ratio = w / userWeight;
-            const lowerEx = ex.toLowerCase();
-            if (lowerEx.includes('bench')) {
-                if (ratio > 1.5) return { label: 'ELITE ⚡', color: 'text-red-500' };
-                if (ratio > 1.2) return { label: 'POKROČILÝ 🔥', color: 'text-orange-500' };
-                return { label: 'ZAČÁTEČNÍK 💪', color: 'text-yellow-500' };
-            }
-            if (lowerEx.includes('deadlift') || lowerEx.includes('mrtv')) {
-                if (ratio > 2.5) return { label: 'ELITE ⚡', color: 'text-red-500' };
-                if (ratio > 2.0) return { label: 'POKROČILÝ 🔥', color: 'text-orange-500' };
-                return { label: 'ZAČÁTEČNÍK 💪', color: 'text-yellow-500' };
-            }
-            return { label: 'DOBRÁ PRÁCE 👊', color: 'text-blue-500' };
-        };
+            useEffect(() => {
+                localStorage.setItem('francis_user_weight', userWeight.toString());
+            }, [userWeight]);
 
-        const handleChat = () => {
-            if (!userInput.trim()) return;
-            const msg = userInput.toLowerCase();
-            setChatMessages(prev => [...prev, { role: 'user', text: userInput }]);
-            setUserInput('');
-            setIsThinking(true);
+            useEffect(() => {
+                chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+            }, [chatMessages, isThinking]);
 
-            setTimeout(() => {
-                let reply = "Zajímavý dotaz! Zkus se zeptat konkrétněji na techniku dřepu, mrtvého tahu nebo jak nastavit bílkoviny.";
-                
-                if (msg.includes("bench")) reply = "U bench-pressu hlídej 'arch' (mírné prohnutí), lopatky u sebe a lokty nepouštěj příliš kolmo k tělu, spíše mírně k pasu. 3-5 minut pauza mezi těžkými sety!";
-                if (msg.includes("mrtv") || msg.includes("deadlift")) reply = "Mrtvý tah je o tlaku nohama do země, ne o tahání zády. Před odlepením osy se pořádně 'zpevni' (bracing) a nadechni do břicha.";
-                if (msg.includes("jist") || msg.includes("strava") || msg.includes("protein")) reply = "Základ je 1.6 - 2.2g bílkovin na kilo váhy. Pokud chceš nabírat, jez o 300 kcal víc, než vydáš. Spánek 7-9h je nejdůležitější suplement!";
-                if (msg.includes("zhubnout")) reply = "Hubnutí je o kalorickém deficitu. Počítej si makra, hýbej se a hlavně nevynechávej silový trénink, ať pálíš tuk a ne svaly.";
-                
-                setChatMessages(prev => [...prev, { role: 'ai', text: reply }]);
-                setIsThinking(false);
-            }, 800);
-        };
+            const addSet = () => {
+                if (newSet.exercise && newSet.weight && newSet.reps) {
+                    setSets([{ id: Date.now(), ...newSet, date: new Date().toISOString() }, ...sets]);
+                    setNewSet({ ...newSet, weight: '', reps: '' }); 
+                }
+            };
 
-        return (
-            <div className="min-h-screen flex flex-col max-w-2xl mx-auto border-x border-white/5 shadow-2xl bg-[#07090C]">
-                <header className="p-6 flex justify-between items-center bg-black/40 backdrop-blur-md sticky top-0 z-50 border-b border-white/5">
-                    <div className="flex items-center gap-3">
-                        <div className="p-2 bg-red-600 rounded-lg glow-red">
-                            <Icon name="zap" size={20} className="fill-white" />
+            const deleteSet = (id) => {
+                setSets(sets.filter(s => s.id !== id));
+            };
+
+            const clearAll = () => {
+                if (confirm('Opravdu chceš smazat všechnu historii?')) {
+                    setSets([]);
+                }
+            };
+
+            const today = new Date().getDay();
+            const todayPlan = TRAINING_PLAN[today];
+
+            const prs = useMemo(() => {
+                const bests = {};
+                sets.forEach(s => {
+                    const weight = parseFloat(s.weight);
+                    if (!bests[s.exercise] || weight > parseFloat(bests[s.exercise].weight)) {
+                        bests[s.exercise] = s;
+                    }
+                });
+                return Object.values(bests);
+            }, [sets]);
+
+            const totalVolume = useMemo(() => {
+                return sets.reduce((acc, s) => acc + (parseFloat(s.weight) * parseInt(s.reps)), 0);
+            }, [sets]);
+
+            const calculate1RM = (w, r) => {
+                if (!w || !r || r < 1) return null;
+                const weight = parseFloat(w);
+                const reps = parseInt(r);
+                return (weight * (1 + reps / 30)).toFixed(1); 
+            };
+
+            const getRank = (ex, w) => {
+                const ratio = w / userWeight;
+                const lowerEx = ex.toLowerCase();
+                if (lowerEx.includes('bench')) {
+                    if (ratio > 1.5) return { label: 'ELITE ⚡', color: 'text-red-500' };
+                    if (ratio > 1.2) return { label: 'POKROČILÝ 🔥', color: 'text-orange-500' };
+                    return { label: 'ZAČÁTEČNÍK 💪', color: 'text-yellow-500' };
+                }
+                if (lowerEx.includes('deadlift') || lowerEx.includes('mrtv')) {
+                    if (ratio > 2.5) return { label: 'ELITE ⚡', color: 'text-red-500' };
+                    if (ratio > 2.0) return { label: 'POKROČILÝ 🔥', color: 'text-orange-500' };
+                    return { label: 'ZAČÁTEČNÍK 💪', color: 'text-yellow-500' };
+                }
+                return { label: 'DOBRÁ PRÁCE 👊', color: 'text-blue-500' };
+            };
+
+            const handleChat = () => {
+                if (!userInput.trim()) return;
+                const msg = userInput.toLowerCase();
+                setChatMessages(prev => [...prev, { role: 'user', text: userInput }]);
+                setUserInput('');
+                setIsThinking(true);
+
+                setTimeout(() => {
+                    let reply = "Zajímavý dotaz! Zkus se zeptat konkrétněji na techniku dřepu, mrtvého tahu nebo jak nastavit bílkoviny.";
+                    
+                    if (msg.includes("bench")) reply = "U bench-pressu hlídej 'arch' (mírné prohnutí), lopatky u sebe a lokty nepouštěj příliš kolmo k tělu, spíše mírně k pasu. 3-5 minut pauza mezi těžkými sety!";
+                    if (msg.includes("mrtv") || msg.includes("deadlift")) reply = "Mrtvý tah je o tlaku nohama do země, ne o tahání zády. Před odlepením osy se pořádně 'zpevni' (bracing) a nadechni do břicha.";
+                    if (msg.includes("jist") || msg.includes("strava") || msg.includes("protein")) reply = "Základ je 1.6 - 2.2g bílkovin na kilo váhy. Pokud chceš nabírat, jez o 300 kcal víc, než vydáš. Spánek 7-9h je nejdůležitější suplement!";
+                    if (msg.includes("zhubnout")) reply = "Hubnutí je o kalorickém deficitu. Počítej si makra, hýbej se a hlavně nevynechávej silový trénink, ať pálíš tuk a ne svaly.";
+                    if (msg.includes("plán") || msg.includes("dnes")) reply = `Dnes je ${todayPlan.name} a podle plánu máš na programu: ${todayPlan.focus}. Rozdrť to! 💪`;
+                    
+                    setChatMessages(prev => [...prev, { role: 'ai', text: reply }]);
+                    setIsThinking(false);
+                }, 800);
+            };
+
+            return (
+                <div className="min-h-screen flex flex-col max-w-2xl mx-auto border-x border-white/5 shadow-2xl bg-[#07090C]">
+                    <header className="p-6 flex justify-between items-center bg-black/40 backdrop-blur-md sticky top-0 z-50 border-b border-white/5">
+                        <div className="flex items-center gap-3">
+                            <div className="p-2 bg-red-600 rounded-lg glow-red">
+                                <Icon name="zap" size={20} className="fill-white" />
+                            </div>
+                            <h1 className="text-xl font-black italic tracking-tighter uppercase">FRANCIS <span className="gradient-text">LIFTS</span></h1>
                         </div>
-                        <h1 className="text-xl font-black italic tracking-tighter">FRANCIS <span className="gradient-text">LIFTS</span></h1>
-                    </div>
-                    <div className="flex items-center gap-4">
-                        <button onClick={clearAll} className="p-2 text-slate-500 hover:text-red-500 transition-colors">
-                            <Icon name="trash-2" size={20} />
-                        </button>
-                    </div>
-                </header>
+                        <div className="flex items-center gap-4">
+                            <button onClick={clearAll} className="p-2 text-slate-500 hover:text-red-500 transition-colors">
+                                <Icon name="trash-2" size={20} />
+                            </button>
+                        </div>
+                    </header>
 
-                <main className="flex-1 p-4 pb-32 overflow-y-auto scrollbar-hide">
-                    {activeTab === 'diary' && (
-                        <div className="space-y-6 card-enter">
-                            <div className="grid grid-cols-2 gap-3">
-                                <div className="bg-[#12161D] p-4 rounded-2xl border border-white/5">
-                                    <div className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Celkový Objem</div>
-                                    <div className="text-xl font-black">{totalVolume.toLocaleString()} <span className="text-xs text-red-500">KG</span></div>
+                    <main className="flex-1 p-4 pb-32 overflow-y-auto scrollbar-hide">
+                        {activeTab === 'diary' && (
+                            <div className="space-y-6 card-enter">
+                                {/* Kalendář / Plán */}
+                                <section className="bg-[#12161D] p-5 rounded-3xl border border-white/5">
+                                    <h2 className="text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-4 px-1">Týdenní Tréninkový Split</h2>
+                                    <div className="grid grid-cols-7 gap-2">
+                                        {[1, 2, 3, 4, 5, 6, 0].map(day => {
+                                            const info = TRAINING_PLAN[day];
+                                            const isToday = day === today;
+                                            return (
+                                                <div key={day} className={`flex flex-col items-center p-2 rounded-xl border transition-all ${isToday ? 'bg-red-600 border-red-500 glow-red' : 'bg-black/20 border-white/5 opacity-60'}`}>
+                                                    <span className="text-[10px] font-bold mb-1">{info.name.substring(0, 2)}</span>
+                                                    <Icon name={info.icon} size={14} className={isToday ? "text-white" : "text-slate-400"} />
+                                                </div>
+                                            );
+                                        })}
+                                    </div>
+                                    <div className="mt-4 p-3 bg-black/30 rounded-2xl flex items-center gap-3 border border-white/5">
+                                        <div className="p-2 bg-red-600/20 rounded-lg">
+                                            <Icon name="calendar" size={16} className="text-red-500" />
+                                        </div>
+                                        <div>
+                                            <div className="text-[10px] font-bold text-slate-500 uppercase">Dnešní fokus</div>
+                                            <div className="text-sm font-bold text-white">{todayPlan.focus}</div>
+                                        </div>
+                                    </div>
+                                </section>
+
+                                <div className="grid grid-cols-2 gap-3">
+                                    <div className="bg-[#12161D] p-4 rounded-2xl border border-white/5">
+                                        <div className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Celkový Objem</div>
+                                        <div className="text-xl font-black">{totalVolume.toLocaleString()} <span className="text-xs text-red-500">KG</span></div>
+                                    </div>
+                                    <div className="bg-[#12161D] p-4 rounded-2xl border border-white/5">
+                                        <div className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Série dnes</div>
+                                        <div className="text-xl font-black">{sets.length} <span className="text-xs text-red-500">SETS</span></div>
+                                    </div>
                                 </div>
-                                <div className="bg-[#12161D] p-4 rounded-2xl border border-white/5">
-                                    <div className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Počet Sérií</div>
-                                    <div className="text-xl font-black">{sets.length} <span className="text-xs text-red-500">SETS</span></div>
+
+                                <div className="bg-[#12161D] p-6 rounded-3xl border border-red-600/20">
+                                    <h2 className="text-xs font-black uppercase text-red-500 mb-4 tracking-widest flex items-center gap-2">
+                                        <Icon name="plus-circle" size={14} /> Nová Série
+                                    </h2>
+                                    <div className="space-y-3">
+                                        <input 
+                                            placeholder="Cvik (např. Benchpress)" 
+                                            value={newSet.exercise}
+                                            onChange={e => setNewSet({...newSet, exercise: e.target.value})}
+                                            className="w-full bg-black/40 border border-white/10 p-4 rounded-xl font-medium text-white placeholder:text-slate-600"
+                                        />
+                                        <div className="flex gap-3">
+                                            <input 
+                                                type="number" placeholder="Váha kg" 
+                                                value={newSet.weight}
+                                                onChange={e => setNewSet({...newSet, weight: e.target.value})}
+                                                className="w-1/2 bg-black/40 border border-white/10 p-4 rounded-xl font-medium text-center text-white placeholder:text-slate-600"
+                                            />
+                                            <input 
+                                                type="number" placeholder="Opakování" 
+                                                value={newSet.reps}
+                                                onChange={e => setNewSet({...newSet, reps: e.target.value})}
+                                                className="w-1/2 bg-black/40 border border-white/10 p-4 rounded-xl font-medium text-center text-white placeholder:text-slate-600"
+                                            />
+                                        </div>
+                                        <button 
+                                            onClick={addSet}
+                                            className="w-full bg-red-600 hover:bg-red-500 py-4 rounded-2xl font-black uppercase text-sm tracking-widest transition-all glow-red"
+                                        >
+                                            Uložit Sérii
+                                        </button>
+                                    </div>
+                                </div>
+
+                                <div className="space-y-3">
+                                    <h3 className="text-[10px] font-bold text-slate-500 uppercase tracking-widest px-2">Poslední záznamy</h3>
+                                    {sets.map(s => (
+                                        <div key={s.id} className="bg-[#12161D]/50 p-4 rounded-2xl flex justify-between items-center border border-white/5 group">
+                                            <div>
+                                                <div className="font-bold text-sm text-white">{s.exercise}</div>
+                                                <div className="text-xs text-slate-500">{s.weight}kg × {s.reps} reps</div>
+                                            </div>
+                                            <button onClick={() => deleteSet(s.id)} className="p-2 text-slate-700 hover:text-red-500 transition-colors">
+                                                <Icon name="trash" size={16} />
+                                            </button>
+                                        </div>
+                                    ))}
+                                    {sets.length === 0 && <div className="text-center py-10 text-slate-600 text-sm italic">Zatím žádné záznamy. Makej! 🏋️‍♂️</div>}
                                 </div>
                             </div>
+                        )}
 
-                            <div className="bg-[#12161D] p-6 rounded-3xl border border-red-600/20">
-                                <h2 className="text-xs font-black uppercase text-red-500 mb-4 tracking-widest flex items-center gap-2">
-                                    <Icon name="plus-circle" size={14} /> Nová Série
-                                </h2>
-                                <div className="space-y-3">
-                                    <input 
-                                        placeholder="Cvik (např. Dřep)" 
-                                        value={newSet.exercise}
-                                        onChange={e => setNewSet({...newSet, exercise: e.target.value})}
-                                        className="w-full bg-black/40 border border-white/10 p-4 rounded-xl font-medium"
-                                    />
-                                    <div className="flex gap-3">
-                                        <input 
-                                            type="number" placeholder="Váha kg" 
-                                            value={newSet.weight}
-                                            onChange={e => setNewSet({...newSet, weight: e.target.value})}
-                                            className="w-1/2 bg-black/40 border border-white/10 p-4 rounded-xl font-medium text-center"
-                                        />
-                                        <input 
-                                            type="number" placeholder="Opakování" 
-                                            value={newSet.reps}
-                                            onChange={e => setNewSet({...newSet, reps: e.target.value})}
-                                            className="w-1/2 bg-black/40 border border-white/10 p-4 rounded-xl font-medium text-center"
-                                        />
+                        {activeTab === 'prs' && (
+                            <div className="space-y-6 card-enter">
+                                <div className="bg-gradient-to-br from-red-600/20 to-orange-600/10 p-8 rounded-3xl border border-red-600/30 text-center">
+                                    <div className="text-[10px] font-bold text-red-500 uppercase tracking-widest mb-1">Tvá aktuální váha</div>
+                                    <div className="flex justify-center items-center gap-6">
+                                        <button onClick={() => setUserWeight(prev => prev - 0.5)} className="p-3 bg-black/40 rounded-full hover:bg-black/60"><Icon name="minus" size={18}/></button>
+                                        <span className="text-4xl font-black tracking-tight">{userWeight}<span className="text-lg ml-1 text-slate-500">kg</span></span>
+                                        <button onClick={() => setUserWeight(prev => prev + 0.5)} className="p-3 bg-black/40 rounded-full hover:bg-black/60"><Icon name="plus" size={18}/></button>
                                     </div>
-                                    <button 
-                                        onClick={addSet}
-                                        className="w-full bg-red-600 hover:bg-red-500 py-4 rounded-2xl font-black uppercase text-sm tracking-widest transition-all glow-red"
-                                    >
-                                        Uložit Sérii
+                                </div>
+
+                                <div className="space-y-3">
+                                    <h3 className="text-[10px] font-bold text-slate-500 uppercase tracking-widest px-2">Osobní Rekordy</h3>
+                                    {prs.map((pr, i) => {
+                                        const rank = getRank(pr.exercise, parseFloat(pr.weight));
+                                        return (
+                                            <div key={i} className="bg-[#12161D] p-5 rounded-2xl border border-white/5 flex justify-between items-center transition-transform hover:scale-[1.02]">
+                                                <div>
+                                                    <div className="text-[10px] font-bold text-slate-500 uppercase">{pr.exercise}</div>
+                                                    <div className="text-2xl font-black">{pr.weight}kg</div>
+                                                    <div className={`text-[10px] font-black uppercase ${rank.color}`}>{rank.label}</div>
+                                                </div>
+                                                <div className="p-4 bg-black/30 rounded-2xl">
+                                                    <Icon name="award" size={28} className="text-red-500" />
+                                                </div>
+                                            </div>
+                                        );
+                                    })}
+                                    {prs.length === 0 && <div className="text-center py-10 text-slate-600 text-sm italic">Zapiš trénink, aby se ukázaly tvoje rekordy.</div>}
+                                </div>
+                            </div>
+                        )}
+
+                        {activeTab === 'calc' && (
+                            <div className="space-y-6 card-enter">
+                                <div className="bg-[#12161D] p-6 rounded-3xl border border-white/5">
+                                    <h2 className="text-xs font-black uppercase text-red-500 mb-6 tracking-widest">Kalkulačka Maximálky (1RM)</h2>
+                                    <div className="space-y-6">
+                                        <div className="flex gap-4">
+                                            <div className="flex-1 space-y-2">
+                                                <label className="text-[10px] font-bold text-slate-500 uppercase px-1">Váha (kg)</label>
+                                                <input 
+                                                    type="number" 
+                                                    value={calcInput.weight}
+                                                    onChange={e => setCalcInput({...calcInput, weight: e.target.value})}
+                                                    className="w-full bg-black/40 border border-white/10 p-4 rounded-xl text-center font-bold text-white"
+                                                />
+                                            </div>
+                                            <div className="flex-1 space-y-2">
+                                                <label className="text-[10px] font-bold text-slate-500 uppercase px-1">Opakování</label>
+                                                <input 
+                                                    type="number" 
+                                                    value={calcInput.reps}
+                                                    onChange={e => setCalcInput({...calcInput, reps: e.target.value})}
+                                                    className="w-full bg-black/40 border border-white/10 p-4 rounded-xl text-center font-bold text-white"
+                                                />
+                                            </div>
+                                        </div>
+
+                                        {calculate1RM(calcInput.weight, calcInput.reps) && (
+                                            <div className="mt-8 p-8 bg-red-600 rounded-3xl text-center glow-red animate-pulse">
+                                                <div className="text-xs font-bold uppercase opacity-80 mb-1">Tvůj odhadovaný strop</div>
+                                                <div className="text-5xl font-black">{calculate1RM(calcInput.weight, calcInput.reps)}<span className="text-xl ml-1">kg</span></div>
+                                            </div>
+                                        )}
+                                    </div>
+                                </div>
+                                <div className="bg-[#12161D]/50 p-6 rounded-2xl text-xs text-slate-500 leading-relaxed border border-white/5">
+                                    💡 <strong>Tip pro liftery:</strong> Výpočet maximálky je nejpřesnější v rozmezí 2 až 8 opakování. U vyšších počtů už hraje velkou roli vytrvalost.
+                                </div>
+                            </div>
+                        )}
+
+                        {activeTab === 'chat' && (
+                            <div className="flex flex-col h-[70vh] card-enter">
+                                <div className="flex-1 overflow-y-auto space-y-4 scrollbar-hide pr-2 mb-4">
+                                    {chatMessages.map((m, i) => (
+                                        <div key={i} className={`flex ${m.role === 'user' ? 'justify-end' : 'justify-start'}`}>
+                                            <div className={`max-w-[85%] p-4 rounded-2xl text-sm leading-relaxed shadow-lg ${
+                                                m.role === 'user' 
+                                                ? 'bg-red-600 font-medium text-white rounded-br-none' 
+                                                : 'bg-[#12161D] border border-white/10 text-slate-200 rounded-bl-none'
+                                            }`}>
+                                                {m.text}
+                                            </div>
+                                        </div>
+                                    ))}
+                                    {isThinking && (
+                                        <div className="flex justify-start">
+                                            <div className="bg-[#12161D] p-4 rounded-2xl text-xs text-slate-500 italic animate-pulse">
+                                                Francis Coach píše...
+                                            </div>
+                                        </div>
+                                    )}
+                                    <div ref={chatEndRef} />
+                                </div>
+                                
+                                <div className="flex gap-2 bg-[#12161D] p-2 rounded-2xl border border-white/10">
+                                    <input 
+                                        placeholder="Zeptej se kouče..."
+                                        value={userInput}
+                                        onChange={e => setUserInput(e.target.value)}
+                                        onKeyPress={e => e.key === 'Enter' && handleChat()}
+                                        className="flex-1 bg-transparent border-none p-3 text-sm focus:ring-0 text-white"
+                                    />
+                                    <button onClick={handleChat} className="bg-red-600 p-3 rounded-xl transition-transform active:scale-90">
+                                        <Icon name="send" size={20} />
                                     </button>
                                 </div>
                             </div>
+                        )}
+                    </main>
 
-                            <div className="space-y-3">
-                                <h3 className="text-[10px] font-bold text-slate-500 uppercase tracking-widest px-2">Historie tréninku</h3>
-                                {sets.map(s => (
-                                    <div key={s.id} className="bg-[#12161D]/50 p-4 rounded-2xl flex justify-between items-center border border-white/5 group">
-                                        <div>
-                                            <div className="font-bold text-sm">{s.exercise}</div>
-                                            <div className="text-xs text-slate-500">{s.weight}kg × {s.reps} reps</div>
-                                        </div>
-                                        <button onClick={() => deleteSet(s.id)} className="p-2 text-slate-700 hover:text-red-500 transition-colors">
-                                            <Icon name="trash" size={16} />
-                                        </button>
-                                    </div>
-                                ))}
-                                {sets.length === 0 && <div className="text-center py-10 text-slate-600 text-sm italic">Zatím žádné záznamy. Makej! 🏋️‍♂️</div>}
-                            </div>
-                        </div>
-                    )}
-
-                    {activeTab === 'prs' && (
-                        <div className="space-y-6 card-enter">
-                            <div className="bg-gradient-to-br from-red-600/20 to-orange-600/10 p-8 rounded-3xl border border-red-600/30 text-center">
-                                <div className="text-[10px] font-bold text-red-500 uppercase tracking-widest mb-1">Tvá aktuální váha</div>
-                                <div className="flex justify-center items-center gap-3">
-                                    <button onClick={() => setUserWeight(prev => prev - 1)} className="p-2 bg-black/40 rounded-full hover:bg-black/60"><Icon name="minus" size={16}/></button>
-                                    <span className="text-4xl font-black">{userWeight}kg</span>
-                                    <button onClick={() => setUserWeight(prev => prev + 1)} className="p-2 bg-black/40 rounded-full hover:bg-black/60"><Icon name="plus" size={16}/></button>
-                                </div>
-                            </div>
-
-                            <div className="space-y-3">
-                                {prs.map((pr, i) => {
-                                    const rank = getRank(pr.exercise, parseFloat(pr.weight));
-                                    return (
-                                        <div key={i} className="bg-[#12161D] p-5 rounded-2xl border border-white/5 flex justify-between items-center">
-                                            <div>
-                                                <div className="text-[10px] font-bold text-slate-500 uppercase">{pr.exercise}</div>
-                                                <div className="text-2xl font-black">{pr.weight}kg</div>
-                                                <div className={`text-[10px] font-black uppercase ${rank.color}`}>{rank.label}</div>
-                                            </div>
-                                            <div className="p-3 bg-black/20 rounded-xl">
-                                                <Icon name="award" size={24} className="text-red-500" />
-                                            </div>
-                                        </div>
-                                    );
-                                })}
-                                {prs.length === 0 && <div className="text-center py-10 text-slate-600 text-sm italic">Zapiš trénink, aby se ukázaly tvoje rekordy.</div>}
-                            </div>
-                        </div>
-                    )}
-
-                    {activeTab === 'calc' && (
-                        <div className="space-y-6 card-enter">
-                            <div className="bg-[#12161D] p-6 rounded-3xl border border-white/5">
-                                <h2 className="text-xs font-black uppercase text-red-500 mb-6 tracking-widest">Kalkulačka Maximálky (1RM)</h2>
-                                <div className="space-y-4">
-                                    <div className="flex gap-3">
-                                        <div className="flex-1 space-y-2">
-                                            <label className="text-[10px] font-bold text-slate-500 uppercase px-1">Váha (kg)</label>
-                                            <input 
-                                                type="number" 
-                                                value={calcInput.weight}
-                                                onChange={e => setCalcInput({...calcInput, weight: e.target.value})}
-                                                className="w-full bg-black/40 border border-white/10 p-4 rounded-xl text-center font-bold"
-                                            />
-                                        </div>
-                                        <div className="flex-1 space-y-2">
-                                            <label className="text-[10px] font-bold text-slate-500 uppercase px-1">Opakování</label>
-                                            <input 
-                                                type="number" 
-                                                value={calcInput.reps}
-                                                onChange={e => setCalcInput({...calcInput, reps: e.target.value})}
-                                                className="w-full bg-black/40 border border-white/10 p-4 rounded-xl text-center font-bold"
-                                            />
-                                        </div>
-                                    </div>
-
-                                    {calculate1RM(calcInput.weight, calcInput.reps) && (
-                                        <div className="mt-8 p-6 bg-red-600 rounded-2xl text-center glow-red">
-                                            <div className="text-xs font-bold uppercase opacity-80 mb-1">Tvůj odhadovaný strop</div>
-                                            <div className="text-4xl font-black">{calculate1RM(calcInput.weight, calcInput.reps)}kg</div>
-                                        </div>
-                                    )}
-                                </div>
-                            </div>
-                            <div className="bg-[#12161D]/50 p-6 rounded-2xl text-xs text-slate-500 leading-relaxed border border-white/5">
-                                💡 <strong>Tip:</strong> Výpočet je nejpřesnější pro 2-8 opakování.
-                            </div>
-                        </div>
-                    )}
-
-                    {activeTab === 'chat' && (
-                        <div className="flex flex-col h-[60vh] card-enter">
-                            <div className="flex-1 overflow-y-auto space-y-4 scrollbar-hide pr-2">
-                                {chatMessages.map((m, i) => (
-                                    <div key={i} className={`flex ${m.role === 'user' ? 'justify-end' : 'justify-start'}`}>
-                                        <div className={`max-w-[85%] p-4 rounded-2xl text-sm leading-relaxed ${
-                                            m.role === 'user' 
-                                            ? 'bg-red-600 font-medium' 
-                                            : 'bg-[#12161D] border border-white/10'
-                                        }`}>
-                                            {m.text}
-                                        </div>
-                                    </div>
-                                ))}
-                                {isThinking && (
-                                    <div className="flex justify-start">
-                                        <div className="bg-[#12161D] p-4 rounded-2xl text-xs text-slate-500 italic animate-pulse">
-                                            Kouč přemýšlí...
-                                        </div>
-                                    </div>
-                                )}
-                                <div ref={chatEndRef} />
-                            </div>
-                            
-                            <div className="mt-4 flex gap-2">
-                                <input 
-                                    placeholder="Zeptej se na cokoliv..."
-                                    value={userInput}
-                                    onChange={e => setUserInput(e.target.value)}
-                                    onKeyPress={e => e.key === 'Enter' && handleChat()}
-                                    className="flex-1 bg-[#12161D] border border-white/10 p-4 rounded-xl text-sm"
-                                />
-                                <button onClick={handleChat} className="bg-red-600 p-4 rounded-xl">
-                                    <Icon name="send" size={20} />
+                    <nav className="fixed bottom-0 left-0 right-0 bg-black/80 backdrop-blur-xl border-t border-white/10 pb-8 pt-3 z-50">
+                        <div className="flex justify-around max-w-2xl mx-auto px-4">
+                            {[
+                                { id: 'diary', icon: 'book-open', label: 'Deník' },
+                                { id: 'prs', icon: 'award', label: 'Rekordy' },
+                                { id: 'calc', icon: 'calculator', label: '1RM' },
+                                { id: 'chat', icon: 'message-square', label: 'Kouč' },
+                            ].map(t => (
+                                <button 
+                                    key={t.id}
+                                    onClick={() => setActiveTab(t.id)}
+                                    className={`flex flex-col items-center gap-1.5 px-4 py-2 rounded-2xl tab-transition ${
+                                        activeTab === t.id ? 'bg-red-600/10 text-red-500 scale-105' : 'text-slate-500 opacity-60'
+                                    }`}
+                                >
+                                    <Icon name={t.icon} size={22} className={activeTab === t.id ? "stroke-[2.5px]" : "stroke-[2px]"} />
+                                    <span className="text-[10px] font-black uppercase tracking-tighter">{t.label}</span>
                                 </button>
-                            </div>
+                            ))}
                         </div>
-                    )}
-                </main>
+                    </nav>
+                </div>
+            );
+        }
 
-                <nav className="fixed bottom-0 left-0 right-0 bg-black/80 backdrop-blur-xl border-t border-white/10 pb-8 pt-2 z-50">
-                    <div className="flex justify-around max-w-2xl mx-auto px-4">
-                        {[
-                            { id: 'diary', icon: 'book-open', label: 'Deník' },
-                            { id: 'prs', icon: 'award', label: 'Rekordy' },
-                            { id: 'calc', icon: 'calculator', label: '1RM' },
-                            { id: 'chat', icon: 'message-square', label: 'Kouč' },
-                        ].map(t => (
-                            <button 
-                                key={t.id}
-                                onClick={() => setActiveTab(t.id)}
-                                className={`flex flex-col items-center gap-1.5 p-2 rounded-xl tab-transition ${
-                                    activeTab === t.id ? 'text-red-500 scale-110' : 'text-slate-500'
-                                }`}
-                            >
-                                <Icon name={t.icon} size={22} className={activeTab === t.id ? "stroke-[3px]" : "stroke-[2px]"} />
-                                <span className="text-[10px] font-black uppercase tracking-tighter">{t.label}</span>
-                            </button>
-                        ))}
-                    </div>
-                </nav>
-            </div>
-        );
-    }
-
-    const root = ReactDOM.createRoot(document.getElementById('app'));
-    root.render(<App />);
-</script>
+        const root = ReactDOM.createRoot(document.getElementById('app'));
+        root.render(<App />);
+    </script>
+</body>
+</html>
