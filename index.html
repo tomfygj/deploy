@@ -102,6 +102,16 @@
             filter: invert(1);
             cursor: pointer;
         }
+
+        .chart-line {
+            stroke-dasharray: 1000;
+            stroke-dashoffset: 1000;
+            animation: dash 2s linear forwards;
+        }
+
+        @keyframes dash {
+            to { stroke-dashoffset: 0; }
+        }
     </style>
 </head>
 <body>
@@ -152,7 +162,11 @@
 
         function App() {
             const [activeTab, setActiveTab] = useState('diary');
-            const [selectedDate, setSelectedDate] = useState(new Date());
+            const [selectedDate, setSelectedDate] = useState(() => {
+                const d = new Date();
+                d.setHours(0, 0, 0, 0); // Resetujeme čas pro přesné porovnávání
+                return d;
+            });
             const [timer, setTimer] = useState(null);
             const [isMenuOpen, setIsMenuOpen] = useState(false);
             
@@ -169,28 +183,29 @@
                 return saved ? JSON.parse(saved) : [];
             });
 
+            const [weightHistory, setWeightHistory] = useState(() => {
+                const saved = localStorage.getItem('francis_weight_history');
+                return saved ? JSON.parse(saved) : [{ date: new Date().toISOString().split('T')[0], weight: 85 }];
+            });
+
+            const [newWeightEntry, setNewWeightEntry] = useState({ weight: '', date: new Date().toISOString().split('T')[0] });
+
             const [newSet, setNewSet] = useState({ exercise: '', weight: '', reps: '' });
 
             useEffect(() => {
                 localStorage.setItem('francis_pro_sets', JSON.stringify(sets));
                 localStorage.setItem('francis_profile', JSON.stringify(profile));
-            }, [sets, profile]);
-
-            useEffect(() => {
-                let interval;
-                if (timer > 0) {
-                    interval = setInterval(() => setTimer(t => t - 1), 1000);
-                } else if (timer === 0) {
-                    setTimer(null);
-                }
-                return () => clearInterval(interval);
-            }, [timer]);
+                localStorage.setItem('francis_weight_history', JSON.stringify(weightHistory));
+            }, [sets, profile, weightHistory]);
 
             const bmi = useMemo(() => {
-                const hMeters = profile.height / 100;
-                return (profile.weight / (hMeters * hMeters)).toFixed(1);
-            }, [profile]);
-            const weekDays = useMemo(() => getWeekDays(selectedDate), [selectedDate.toDateString()]);
+                const h = parseFloat(profile.height) / 100;
+                const w = parseFloat(profile.weight);
+                if (!h || !w) return "0.0";
+                return (w / (h * h)).toFixed(1);
+            }, [profile.weight, profile.height]);
+
+            const weekDays = useMemo(() => getWeekDays(selectedDate), [selectedDate.getTime()]);
             
             const filteredSets = useMemo(() => {
                 return sets.filter(s => {
@@ -201,7 +216,6 @@
 
             const addSet = () => {
                 if (!newSet.exercise || !newSet.weight || !newSet.reps) return;
-                // Ukládáme přesný čas pro řazení, ale pro filtrování používáme vybraný den
                 const setWithDate = { 
                     ...newSet, 
                     id: Date.now(), 
@@ -209,8 +223,19 @@
                 };
                 setSets([setWithDate, ...sets]);
                 setNewSet({ ...newSet, weight: '', reps: '' });
-                // Spustit timer automaticky po uložení (např. 90s)
                 setTimer(90);
+            };
+
+            const selectDateFromInput = (val) => {
+                if (!val) return;
+                const [year, month, day] = val.split('-').map(Number);
+                const newD = new Date(year, month - 1, day);
+                newD.setHours(0, 0, 0, 0);
+                setSelectedDate(newD);
+            };
+
+            const deleteSet = (id) => {
+                setSets(sets.filter(item => item.id !== id));
             };
 
             const oneRepMax = useMemo(() => {
@@ -218,9 +243,37 @@
                 const r = parseFloat(calcReps);
                 if (!w || !r) return 0;
                 if (r === 1) return w;
-                // Epley Formula: 1RM = w * (1 + r/30)
                 return Math.round(w * (1 + r / 30));
             }, [calcWeight, calcReps]);
+
+            const weightChartData = useMemo(() => {
+                if (weightHistory.length < 2) return null;
+                const sorted = [...weightHistory].sort((a, b) => new Date(a.date) - new Date(b.date));
+                const weights = sorted.map(d => parseFloat(d.weight));
+                const minW = Math.min(...weights) - 2;
+                const maxW = Math.max(...weights) + 2;
+                const range = maxW - minW || 1;
+                
+                const width = 300;
+                const height = 150;
+                
+                const points = sorted.map((d, i) => {
+                    const x = (i / (sorted.length - 1)) * width;
+                    const y = height - ((parseFloat(d.weight) - minW) / range) * height;
+                    return `${x},${y}`;
+                }).join(' ');
+
+                return { points, minW, maxW, sorted };
+            }, [weightHistory]);
+
+            const addWeightEntry = () => {
+                if (!newWeightEntry.weight || !newWeightEntry.date) return;
+                const updated = [...weightHistory.filter(h => h.date !== newWeightEntry.date), 
+                    { weight: parseFloat(newWeightEntry.weight), date: newWeightEntry.date }];
+                setWeightHistory(updated);
+                setProfile({ ...profile, weight: parseFloat(newWeightEntry.weight) });
+                setNewWeightEntry({ ...newWeightEntry, weight: '' });
+            };
 
             return (
                 <div className="min-h-screen bg-[#05070A] flex flex-col max-w-md mx-auto relative pb-28">
@@ -343,15 +396,11 @@
                                         <div className="relative">
                                             <input 
                                                 type="date" 
-                                                className="opacity-0 absolute inset-0 w-full cursor-pointer z-10"
-                                                onChange={(e) => {
-                                                    if (e.target.value) {
-                                                        const parts = e.target.value.split('-');
-                                                        setSelectedDate(new Date(parts[0], parts[1] - 1, parts[2]));
-                                                    }
-                                                }}
+                                                value={selectedDate.toISOString().split('T')[0]}
+                                                className="opacity-0 absolute inset-0 w-full h-full cursor-pointer z-10"
+                                                onChange={(e) => selectDateFromInput(e.target.value)}
                                             />
-                                            <div className="bg-red-600/10 p-3 rounded-2xl border border-red-500/20 text-red-500 hover:bg-red-600/20 transition-all">
+                                            <div className="bg-red-600/10 p-3 rounded-2xl border border-red-500/20 text-red-500 hover:bg-red-600/20 transition-all pointer-events-none">
                                                 <Icon name="calendar" size={18} />
                                             </div>
                                         </div>
@@ -360,11 +409,17 @@
                                     <div className="flex justify-between gap-1">
                                         {weekDays.map((d, i) => {
                                             const isSelected = d.toDateString() === selectedDate.toDateString();
-                                            const isToday = d.toDateString() === new Date().toDateString();
+                                            const today = new Date();
+                                            today.setHours(0,0,0,0);
+                                            const isToday = d.toDateString() === today.toDateString();
                                             return (
                                                 <div 
                                                     key={i} 
-                                                    onClick={() => setSelectedDate(d)}
+                                                    onClick={() => {
+                                                        const newD = new Date(d);
+                                                        newD.setHours(0,0,0,0);
+                                                        setSelectedDate(newD);
+                                                    }}
                                                     className={`day-node flex-1 ${isSelected ? 'day-active' : 'bg-white/5 text-white/30'} ${isToday && !isSelected ? 'border border-red-600/50' : ''}`}
                                                 >
                                                     <span className="text-[9px] font-bold mb-1 opacity-60">{TRAINING_SPLIT[d.getDay()].name.substring(0, 2)}</span>
@@ -446,7 +501,7 @@
                                                         <div className="text-[10px] text-white/40 uppercase font-bold">{s.reps} opakování</div>
                                                     </div>
                                                 </div>
-                                                <button onClick={() => { if(confirm('Smazat?')) setSets(sets.filter(item => item.id !== s.id)) }} className="p-2 text-white/20 hover:text-red-500 transition-all">
+                                                <button onClick={() => deleteSet(s.id)} className="p-2 text-white/20 hover:text-red-500 transition-all">
                                                     <Icon name="trash" size={14} />
                                                 </button>
                                             </div>
@@ -456,6 +511,103 @@
                             </div>
                         )}
                         
+                        {activeTab === 'weight' && (
+                            <div className="space-y-6 animate-in slide-in-from-right duration-300">
+                                <div className="px-2">
+                                    <h3 className="text-xl font-black italic uppercase">Sledování <span className="text-red-500">Váhy</span></h3>
+                                    <p className="text-[10px] text-white/30 uppercase font-black tracking-widest mt-1">Tvůj progres tělesné hmotnosti</p>
+                                </div>
+
+                                {/* Graph Section */}
+                                <div className="glass p-6 rounded-[32px] overflow-hidden">
+                                    {weightChartData ? (
+                                        <div className="space-y-4">
+                                            <div className="flex justify-between items-end mb-2">
+                                                <div className="text-xs font-bold text-white/40">{weightChartData.minW}kg</div>
+                                                <div className="text-xs font-bold text-red-500">{weightChartData.maxW}kg</div>
+                                            </div>
+                                            <svg viewBox="0 0 300 150" className="w-full h-40 overflow-visible">
+                                                <path 
+                                                    d={`M ${weightChartData.points}`} 
+                                                    fill="none" 
+                                                    stroke="url(#grad)" 
+                                                    strokeWidth="4" 
+                                                    strokeLinecap="round" 
+                                                    strokeLinejoin="round"
+                                                    className="chart-line"
+                                                />
+                                                <defs>
+                                                    <linearGradient id="grad" x1="0%" y1="0%" x2="100%" y2="0%">
+                                                        <stop offset="0%" style={{stopColor: '#dc2626', stopOpacity: 1}} />
+                                                        <stop offset="100%" style={{stopColor: '#f97316', stopOpacity: 1}} />
+                                                    </linearGradient>
+                                                </defs>
+                                                {/* Points */}
+                                                {weightChartData.points.split(' ').map((p, i) => {
+                                                    const [x, y] = p.split(',');
+                                                    return <circle key={i} cx={x} cy={y} r="4" fill="white" />;
+                                                })}
+                                            </svg>
+                                            <div className="flex justify-between text-[8px] font-black uppercase text-white/20 mt-4">
+                                                <span>{new Date(weightChartData.sorted[0].date).toLocaleDateString()}</span>
+                                                <span>{new Date(weightChartData.sorted[weightChartData.sorted.length-1].date).toLocaleDateString()}</span>
+                                            </div>
+                                        </div>
+                                    ) : (
+                                        <div className="py-12 text-center text-white/10 font-black uppercase tracking-widest text-sm">
+                                            Potřebuješ alespoň 2 záznamy pro graf
+                                        </div>
+                                    )}
+                                </div>
+
+                                {/* Weight Input */}
+                                <div className="glass p-6 rounded-[32px] border-t border-red-600/30 space-y-4">
+                                    <div className="flex gap-3">
+                                        <div className="flex-1 space-y-1">
+                                            <label className="text-[10px] font-black uppercase text-white/30 tracking-widest px-1">Nová Váha</label>
+                                            <input 
+                                                type="number" placeholder="kg"
+                                                className="w-full p-4 rounded-2xl text-center font-black text-xl"
+                                                value={newWeightEntry.weight}
+                                                onChange={e => setNewWeightEntry({...newWeightEntry, weight: e.target.value})}
+                                            />
+                                        </div>
+                                        <div className="flex-1 space-y-1">
+                                            <label className="text-[10px] font-black uppercase text-white/30 tracking-widest px-1">Datum</label>
+                                            <input 
+                                                type="date"
+                                                className="w-full p-4 rounded-2xl text-center font-bold text-sm h-[60px]"
+                                                value={newWeightEntry.date}
+                                                onChange={e => setNewWeightEntry({...newWeightEntry, date: e.target.value})}
+                                            />
+                                        </div>
+                                    </div>
+                                    <button 
+                                        onClick={addWeightEntry}
+                                        className="w-full bg-red-600 py-4 rounded-2xl font-black uppercase text-sm tracking-widest glow-red active:scale-95 transition-all"
+                                    >
+                                        Uložit Váhu
+                                    </button>
+                                </div>
+
+                                {/* History List */}
+                                <div className="space-y-2">
+                                    {[...weightHistory].sort((a,b) => new Date(b.date) - new Date(a.date)).slice(0, 5).map((h, i) => (
+                                        <div key={i} className="glass p-4 rounded-2xl flex justify-between items-center opacity-60 hover:opacity-100 transition-opacity">
+                                            <span className="text-xs font-bold text-white/40">{new Date(h.date).toLocaleDateString()}</span>
+                                            <span className="font-black">{h.weight} kg</span>
+                                            <button 
+                                                onClick={() => setWeightHistory(weightHistory.filter(item => item.date !== h.date))}
+                                                className="text-white/10 hover:text-red-500"
+                                            >
+                                                <Icon name="trash" size={12} />
+                                            </button>
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+                        )}
+
                         {activeTab === 'prs' && (
                             <div className="space-y-4 animate-in fade-in duration-500">
                                 <h3 className="text-xl font-black italic uppercase px-2">Tvoje <span className="text-red-500">Rekordy</span></h3>
@@ -483,7 +635,6 @@
                             </div>
                         )}
 
-                        {}
                         {activeTab === 'calc' && (
                             <div className="space-y-6 animate-in slide-in-from-bottom duration-500">
                                 <div className="px-2">
@@ -542,6 +693,7 @@
                         {[
                             { id: 'diary', icon: 'calendar', label: 'Deník' },
                             { id: 'prs', icon: 'trophy', label: 'Best' },
+                            { id: 'weight', icon: 'trending-up', label: 'Váha' },
                             { id: 'calc', icon: 'zap', label: '1RM' }
                         ].map(t => (
                             <button 
