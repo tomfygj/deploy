@@ -1,0 +1,111 @@
+<!DOCTYPE html>
+<html lang="cs">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <title>Francis Lifts</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;700;900&display=swap');
+        body { font-family: 'Inter', sans-serif; background-color: #07090C; margin: 0; }
+        input, select { font-size: 16px !important; }
+    </style>
+</head>
+<body>
+    <div id="root"></div>
+    <script type="text/babel">
+        const { useState, useEffect } = React;
+        const LucideIcon = ({ name, size = 20, className = "" }) => <i data-lucide={name} className={className} style={{ width: size, height: size }}></i>;
+        const STRENGTH_STANDARDS = {
+            benchpress: { intermediate: 1.1, advanced: 1.45, elite: 1.8 },
+            deadlift: { intermediate: 1.85, advanced: 2.35, elite: 2.9 },
+            squat: { intermediate: 1.5, advanced: 2.0, elite: 2.5 }
+        };
+        function App() {
+            const [activeTab, setActiveTab] = useState('diary');
+            const [profile] = useState({ weight: 85 });
+            const [records] = useState([
+                { id: 1, exercise: 'Bench Press', weight: 100 },
+                { id: 2, exercise: 'Deadlift', weight: 180 },
+                { id: 3, exercise: 'Squat', weight: 140 }
+            ]);
+            useEffect(() => { setTimeout(() => lucide.createIcons(), 500); }, []);
+            useEffect(() => { lucide.createIcons(); }, [activeTab]);
+            const getRank = (ex, w) => {
+                const ratio = w / profile.weight;
+                const key = ex.toLowerCase().replace(" ", "");
+                const std = STRENGTH_STANDARDS[key] || STRENGTH_STANDARDS.benchpress;
+                if (ratio >= std.elite) return { label: 'ELITE', color: 'text-red-500', pct: 95 };
+                if (ratio >= std.advanced) return { label: 'ADVANCED', color: 'text-orange-500', pct: 80 };
+                return { label: 'INTERMEDIATE', color: 'text-yellow-500', pct: 50 };
+            };
+            return (
+                <div className="min-h-screen pb-32 flex flex-col items-center">
+                    <header className="w-full max-w-md p-6 flex justify-between items-center sticky top-0 bg-[#07090C]/80 z-50">
+                        <div className="flex items-center gap-2">
+                            <div className="bg-red-600 p-2 rounded-lg"><LucideIcon name="zap" size={20} className="text-white" /></div>
+                            <h1 className="text-xl font-black text-white">FRANCIS <span className="text-red-600">LIFTS</span></h1>
+                        </div>
+                        <LucideIcon name="user" className="text-slate-500" />
+                    </header>
+                    <main className="w-full max-w-md px-4 space-y-6">
+                        {activeTab === 'diary' && (
+                            <div className="bg-[#12161D] p-6 rounded-3xl border border-white/5">
+                                <h2 className="text-red-500 mb-4 font-black">Log Workout</h2>
+                                <input placeholder="Exercise" className="w-full bg-[#0B0F15] border border-white/5 p-4 rounded-2xl text-white mb-4" />
+                                <div className="grid grid-cols-2 gap-4">
+                                    <input type="number" placeholder="Weight (kg)" className="bg-[#0B0F15] border border-white/5 p-4 rounded-2xl text-white" />
+                                    <input type="number" placeholder="Reps" className="bg-[#0B0F15] border border-white/5 p-4 rounded-2xl text-white" />
+                                </div>
+                                <button className="w-full bg-red-600 p-4 rounded-2xl text-white font-black mt-4">Save</button>
+                            </div>
+                        )}
+                        {activeTab === 'prs' && (
+                            <div className="space-y-4">
+                                <div className="bg-gradient-to-br from-red-600 to-red-900 p-6 rounded-3xl">
+                                    <span className="text-white/60">Francis Score</span>
+                                    <div className="text-4xl font-black text-white">842</div>
+                                </div>
+                                {records.map(r => {
+                                    const rank = getRank(r.exercise, r.weight);
+                                    return (
+                                        <div key={r.id} className="bg-[#12161D] p-5 rounded-3xl border border-white/5 flex justify-between">
+                                            <div>
+                                                <h3 className="text-slate-500 font-black">{r.exercise}</h3>
+                                                <div className="text-2xl text-white font-black">{r.weight}kg</div>
+                                                <span className={`text-sm ${rank.color}`}>{rank.label}</span>
+                                            </div>
+                                            <div className="text-right">
+                                                <div className="text-slate-500">Percentile</div>
+                                                <div className="text-xl font-black text-white">{rank.pct}%</div>
+                                            </div>
+                                        </div>
+                                    );
+                                })}
+                            </div>
+                        )}
+                    </main>
+                    <nav className="fixed bottom-6 w-[90%] max-w-md bg-[#12161D]/90 p-2 rounded-3xl flex justify-between z-50">
+                        {[
+                            { id: 'diary', icon: 'history', label: 'Diary' },
+                            { id: 'prs', icon: 'award', label: 'PRs' },
+                            { id: 'ai', icon: 'message-square', label: 'Coach' },
+                            { id: 'calc', icon: 'calculator', label: 'Calc' }
+                        ].map(t => (
+                            <button key={t.id} onClick={() => setActiveTab(t.id)} className={`flex-1 flex flex-col items-center py-3 rounded-2xl ${activeTab === t.id ? 'bg-red-600 text-white' : 'text-slate-500'}`}>
+                                <LucideIcon name={t.icon} size={18} />
+                                <span className="text-[8px] font-black">{t.label}</span>
+                            </button>
+                        ))}
+                    </nav>
+                </div>
+            );
+        }
+        ReactDOM.createRoot(document.getElementById('root')).render(<App />);
+    </script>
+</body>
+</html>
