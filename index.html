@@ -2,50 +2,145 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <title>Francis Lifts</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
     <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
     <script src="https://unpkg.com/lucide@latest"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@xenova/transformers@2.6.0"></script>
+    
     <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;900&display=swap');
+        
         * { margin: 0; padding: 0; box-sizing: border-box; }
+        
         body { 
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', sans-serif;
-            background-color: #07090C;
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+            background: linear-gradient(135deg, #07090C 0%, #0f1419 100%);
             color: white;
             overflow-x: hidden;
+            -webkit-tap-highlight-color: transparent;
+            user-select: none;
+            -webkit-user-select: none;
+        }
+
+        html, body, #app { height: 100%; width: 100%; }
+        
+        .scrollbar-hide::-webkit-scrollbar { display: none; }
+        .scrollbar-hide { -ms-overflow-style: none; scrollbar-width: none; }
+        
+        input, textarea, select {
+            font-size: 16px !important;
+            -webkit-font-smoothing: antialiased;
+        }
+
+        input:focus, textarea:focus {
+            outline: none;
+            border-color: #dc2626 !important;
+            box-shadow: 0 0 0 3px rgba(220, 38, 38, 0.1);
+        }
+
+        button {
+            -webkit-user-select: none;
+            user-select: none;
+            transition: all 0.2s ease;
+        }
+
+        button:active {
+            transform: scale(0.98);
+        }
+
+        .gradient-text {
+            background: linear-gradient(135deg, #dc2626 0%, #f97316 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+
+        .glow-red {
+            box-shadow: 0 0 20px rgba(220, 38, 38, 0.3);
+        }
+
+        @media (max-width: 640px) {
+            body { font-size: 14px; }
+            h1 { font-size: 18px; }
+        }
+
+        @media (min-width: 1024px) {
+            main { max-width: 700px; margin: 0 auto; }
         }
     </style>
 </head>
 <body>
     <div id="app"></div>
-    
+
     <script type="text/babel">
-        const { useState, useEffect } = React;
+        const { useState, useEffect, useRef } = React;
+
+        // AI Chat with Transformers.js (Distilbert for Q&A)
+        let aiModel = null;
+        let aiTokenizer = null;
+
+        async function initializeAI() {
+            try {
+                const { pipeline } = await import('https://cdn.jsdelivr.net/npm/@xenova/transformers@2.6.0');
+                aiModel = await pipeline('question-answering', 'Xenova/distilbert-base-uncased-distilled-squad');
+                return true;
+            } catch (e) {
+                console.log('AI model loading...');
+                return false;
+            }
+        }
+
+        // Pre-trained fitness knowledge base
+        const fitnessKnowledge = `
+            Bench Press is a compound upper body exercise that works the chest, shoulders, and triceps. 
+            Form: Lie flat on a bench, grip the bar slightly wider than shoulder-width, lower the bar to your chest, then press up explosively.
+            Deadlift is the king of exercises working entire posterior chain including back, glutes, and hamstrings.
+            Form: Stand with feet hip-width apart, grip the bar, keep your back straight, and lift by extending hips and knees.
+            Squat works quads, glutes, hamstrings and core. It's essential for leg development.
+            Form: Feet shoulder-width apart, descend by bending knees and hips, keep chest up, descend until thighs parallel to ground.
+            Progressive overload means gradually increasing weight, reps, or sets to continue making gains.
+            Recovery is crucial - aim for 7-9 hours of sleep and eat enough protein (0.7-1g per pound of body weight).
+            Training frequency: Hit each muscle group 2-3 times per week for optimal hypertrophy.
+            Nutrition: Eat in a slight caloric surplus for muscle gain, deficit for fat loss.
+        `;
+
+        const Icon = ({ name, size = 20, className = "" }) => {
+            useEffect(() => {
+                if (window.lucide) window.lucide.createIcons();
+            }, [name]);
+            return <i data-lucide={name} className={className} style={{ width: size, height: size }} stroke="currentColor" strokeWidth="2" fill="none"></i>;
+        };
 
         function App() {
             const [activeTab, setActiveTab] = useState('diary');
-            const [profile, setProfile] = useState({ weight: 85 });
-            const [sets, setSets] = useState([
-                { id: 1, exercise: 'Bench Press', weight: 100, reps: 5 },
-                { id: 2, exercise: 'Deadlift', weight: 180, reps: 3 },
-                { id: 3, exercise: 'Squat', weight: 140, reps: 5 }
-            ]);
+            const [weight, setWeight] = useState(85);
+            const [sets, setSets] = useState([]);
             const [newSet, setNewSet] = useState({ exercise: '', weight: '', reps: '' });
             const [calcInput, setCalcInput] = useState({ weight: '', reps: '' });
+            const [chatMessages, setChatMessages] = useState([{ role: 'ai', text: 'Hey! 💪 Ask me anything about fitness, form, nutrition, or your training routine!' }]);
+            const [userInput, setUserInput] = useState('');
+            const [aiLoaded, setAiLoaded] = useState(false);
+            const [loading, setLoading] = useState(false);
+            const chatEndRef = useRef(null);
 
-            // Calculate 1RM using different equations
-            const calculate1RM = (weight, reps) => {
-                if (!weight || !reps || reps < 1) return null;
-                weight = parseFloat(weight);
-                reps = parseInt(reps);
+            useEffect(() => {
+                initializeAI().then(setAiLoaded);
+                chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+            }, [chatMessages]);
 
-                const brzycki = weight * (36 / (37 - reps));
-                const epley = weight * (1 + reps / 30);
-                const lander = (100 * weight) / (101.3 - 2.67123 * reps);
-
+            const calculate1RM = (w, r) => {
+                if (!w || !r || r < 1) return null;
+                w = parseFloat(w);
+                r = parseInt(r);
+                const brzycki = w * (36 / (37 - r));
+                const epley = w * (1 + r / 30);
+                const lander = (100 * w) / (101.3 - 2.67123 * r);
                 return {
                     brzycki: brzycki.toFixed(1),
                     epley: epley.toFixed(1),
@@ -55,7 +150,7 @@
             };
 
             const getRank = (ex, w) => {
-                const ratio = w / profile.weight;
+                const ratio = w / weight;
                 const standards = {
                     'benchpress': { intermediate: 1.1, advanced: 1.45, elite: 1.8 },
                     'deadlift': { intermediate: 1.85, advanced: 2.35, elite: 2.9 },
@@ -64,19 +159,14 @@
                 const key = ex.toLowerCase().replace(/\s/g, '');
                 const std = standards[key] || standards.benchpress;
                 
-                if (ratio >= std.elite) return { label: 'ELITE', color: '#ef4444', pct: 95 };
-                if (ratio >= std.advanced) return { label: 'ADVANCED', color: '#f97316', pct: 80 };
-                return { label: 'INTERMEDIATE', color: '#eab308', pct: 50 };
+                if (ratio >= std.elite) return { label: 'ELITE 🔥', color: '#ef4444' };
+                if (ratio >= std.advanced) return { label: 'ADVANCED 💯', color: '#f97316' };
+                return { label: 'INTERMEDIATE 💪', color: '#eab308' };
             };
 
             const addSet = () => {
                 if (newSet.exercise && newSet.weight && newSet.reps) {
-                    setSets([...sets, {
-                        id: Date.now(),
-                        exercise: newSet.exercise,
-                        weight: parseFloat(newSet.weight),
-                        reps: parseInt(newSet.reps)
-                    }]);
+                    setSets([...sets, { id: Date.now(), ...newSet }]);
                     setNewSet({ exercise: '', weight: '', reps: '' });
                 }
             };
@@ -85,111 +175,190 @@
                 setSets(sets.filter(s => s.id !== id));
             };
 
-            const clearAllData = () => {
-                if (window.confirm('Clear all sets and PRs? This cannot be undone!')) {
-                    setSets([]);
-                }
+            const clearAll = () => {
+                if (window.confirm('Clear all data?')) setSets([]);
             };
 
             const getPRs = () => {
                 const exercises = {};
                 sets.forEach(set => {
-                    if (!exercises[set.exercise] || set.weight > exercises[set.exercise].weight) {
+                    if (!exercises[set.exercise] || parseFloat(set.weight) > parseFloat(exercises[set.exercise].weight)) {
                         exercises[set.exercise] = set;
                     }
                 });
                 return Object.values(exercises);
             };
 
+            const sendMessage = async () => {
+                if (!userInput.trim()) return;
+                
+                const userMsg = userInput;
+                setChatMessages(prev => [...prev, { role: 'user', text: userMsg }]);
+                setUserInput('');
+                setLoading(true);
+
+                try {
+                    let aiResponse = '';
+                    
+                    if (aiLoaded && aiModel) {
+                        try {
+                            const answer = await aiModel(userMsg, fitnessKnowledge);
+                            aiResponse = answer.answer || generateSmartResponse(userMsg);
+                        } catch (e) {
+                            aiResponse = generateSmartResponse(userMsg);
+                        }
+                    } else {
+                        aiResponse = generateSmartResponse(userMsg);
+                    }
+
+                    setTimeout(() => {
+                        setChatMessages(prev => [...prev, { role: 'ai', text: aiResponse }]);
+                        setLoading(false);
+                    }, 500);
+                } catch (e) {
+                    setChatMessages(prev => [...prev, { role: 'ai', text: 'Oops! Let me think about that... 🤔' }]);
+                    setLoading(false);
+                }
+            };
+
+            const generateSmartResponse = (input) => {
+                const lower = input.toLowerCase();
+                
+                if (lower.includes('bench') || lower.includes('chest')) {
+                    return '💪 Bench Press is a classic! For form: Keep your back arched, grip slightly wider than shoulders, lower to mid-chest, and press explosively. Target 3-4 sets of 6-12 reps depending on your goal!';
+                }
+                if (lower.includes('deadlift')) {
+                    return '🔥 The deadlift! Start with feet hip-width apart, keep your back neutral, and drive through your heels. It works your entire posterior chain. Start with lighter weight to perfect form!';
+                }
+                if (lower.includes('squat')) {
+                    return '🦵 Squats are essential! Keep your chest up, descend until thighs are parallel or lower, and drive through your midfoot. 3-4 sets of 8-15 reps is ideal for hypertrophy!';
+                }
+                if (lower.includes('protein') || lower.includes('nutrition')) {
+                    return '🥗 Protein is key! Aim for 0.7-1g per pound of body weight daily. Good sources: chicken, fish, eggs, Greek yogurt, and legumes. Eat in a caloric surplus to gain muscle!';
+                }
+                if (lower.includes('diet') || lower.includes('eat')) {
+                    return '🍗 For muscle gain: Eat 300-500 calories above maintenance. For fat loss: 300-500 below. Hit your protein targets and stay consistent!';
+                }
+                if (lower.includes('recover') || lower.includes('sleep')) {
+                    return '😴 Recovery is everything! Aim for 7-9 hours of quality sleep. Your muscles grow during rest, not in the gym. Don\'t skip sleep for gains!';
+                }
+                if (lower.includes('form') || lower.includes('how')) {
+                    return '📋 Good form is crucial! Start light, film yourself, compare to form tutorials. It\'s better to lift lighter with perfect form than heavy with bad form. Prevent injuries!';
+                }
+                if (lower.includes('rep') || lower.includes('set')) {
+                    return '📊 Rep ranges: 1-5 reps for strength, 6-12 for hypertrophy, 12+ for endurance. Most people train in the 8-12 rep range. Mix it up for balance!';
+                }
+                return '💬 That\'s a great question! Tell me more about your training goals, exercises, or what you\'re working on. How can I help you get stronger? 💪';
+            };
+
             return (
-                <div style={{ minHeight: '100vh', paddingBottom: '120px', display: 'flex', flexDirection: 'column', alignItems: 'center', backgroundColor: '#07090C' }}>
+                <div className="h-screen bg-gradient-to-br from-[#07090C] to-[#0f1419] flex flex-col">
                     {/* Header */}
-                    <header style={{ width: '100%', maxWidth: '500px', padding: '24px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', position: 'sticky', top: 0, backgroundColor: 'rgba(7, 9, 12, 0.8)', zIndex: 50, backdropFilter: 'blur(12px)' }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                            <div style={{ backgroundColor: '#dc2626', padding: '8px', borderRadius: '8px' }}>
-                                <svg style={{ width: 20, height: 20, color: 'white' }} data-lucide="zap" stroke="currentColor" strokeWidth="2" fill="none" strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon></svg>
+                    <header className="sticky top-0 z-40 bg-gradient-to-b from-[#07090C]/95 to-transparent backdrop-blur-md border-b border-white/5 px-4 sm:px-6 pt-4 sm:pt-6 pb-4">
+                        <div className="flex items-center justify-between max-w-2xl mx-auto">
+                            <div className="flex items-center gap-2 sm:gap-3">
+                                <div className="bg-gradient-to-br from-red-600 to-red-700 p-2 sm:p-2.5 rounded-lg glow-red">
+                                    <Icon name="zap" className="text-white" size={20} />
+                                </div>
+                                <h1 className="text-lg sm:text-2xl font-black italic tracking-tighter">
+                                    FRANCIS <span className="gradient-text">LIFTS</span>
+                                </h1>
                             </div>
-                            <h1 style={{ fontSize: '20px', fontWeight: 900, color: 'white' }}>FRANCIS <span style={{ color: '#dc2626' }}>LIFTS</span></h1>
+                            <button onClick={clearAll} className="p-2 hover:bg-red-600/20 rounded-lg transition-colors" title="Clear all data">
+                                <Icon name="trash-2" className="text-red-500" size={20} />
+                            </button>
                         </div>
-                        <button onClick={clearAllData} style={{ backgroundColor: '#7f1d1d', border: '1px solid #dc2626', padding: '8px 12px', borderRadius: '8px', color: '#fca5a5', cursor: 'pointer', fontSize: '12px', fontWeight: 'bold' }} title="Clear all data">🗑️</button>
                     </header>
 
                     {/* Main Content */}
-                    <main style={{ width: '100%', maxWidth: '500px', padding: '0 16px', marginTop: '24px' }}>
+                    <main className="flex-1 overflow-y-auto scrollbar-hide px-4 sm:px-6 pt-4 pb-24 sm:pb-32 max-w-2xl mx-auto w-full">
                         {activeTab === 'diary' && (
-                            <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-                                <div style={{ backgroundColor: '#12161D', padding: '24px', borderRadius: '24px', border: '1px solid rgba(255,255,255,0.05)' }}>
-                                    <h2 style={{ fontSize: '12px', fontWeight: 900, color: '#dc2626', marginBottom: '16px' }}>LOG WORKOUT</h2>
-                                    <input 
-                                        placeholder="Exercise" 
-                                        value={newSet.exercise}
-                                        onChange={(e) => setNewSet({...newSet, exercise: e.target.value})}
-                                        style={{ width: '100%', backgroundColor: '#0B0F15', border: '1px solid rgba(255,255,255,0.05)', padding: '16px', borderRadius: '16px', color: 'white', marginBottom: '16px', fontSize: '16px' }} 
-                                    />
-                                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', marginBottom: '16px' }}>
+                            <div className="space-y-4 animate-in fade-in">
+                                {/* Input Card */}
+                                <div className="bg-gradient-to-br from-[#12161D] to-[#0f1419] p-5 sm:p-6 rounded-2xl sm:rounded-3xl border border-red-600/20 backdrop-blur-sm hover:border-red-600/40 transition-colors">
+                                    <h2 className="text-xs sm:text-sm font-black uppercase tracking-widest text-red-500 mb-4">➕ Log Workout</h2>
+                                    <div className="space-y-3">
                                         <input 
-                                            type="number" 
-                                            placeholder="Weight (kg)" 
-                                            value={newSet.weight}
-                                            onChange={(e) => setNewSet({...newSet, weight: e.target.value})}
-                                            style={{ backgroundColor: '#0B0F15', border: '1px solid rgba(255,255,255,0.05)', padding: '16px', borderRadius: '16px', color: 'white', fontSize: '16px', textAlign: 'center' }} 
+                                            type="text"
+                                            placeholder="Exercise (e.g., Bench Press)" 
+                                            value={newSet.exercise}
+                                            onChange={(e) => setNewSet({...newSet, exercise: e.target.value})}
+                                            className="w-full bg-[#0B0F15] border border-white/10 px-4 py-3 rounded-xl text-white placeholder-slate-500 font-semibold"
                                         />
-                                        <input 
-                                            type="number" 
-                                            placeholder="Reps" 
-                                            value={newSet.reps}
-                                            onChange={(e) => setNewSet({...newSet, reps: e.target.value})}
-                                            style={{ backgroundColor: '#0B0F15', border: '1px solid rgba(255,255,255,0.05)', padding: '16px', borderRadius: '16px', color: 'white', fontSize: '16px', textAlign: 'center' }} 
-                                        />
+                                        <div className="grid grid-cols-2 gap-3">
+                                            <input 
+                                                type="number"
+                                                placeholder="Weight (kg)" 
+                                                value={newSet.weight}
+                                                onChange={(e) => setNewSet({...newSet, weight: e.target.value})}
+                                                className="bg-[#0B0F15] border border-white/10 px-4 py-3 rounded-xl text-white placeholder-slate-500 font-semibold text-center"
+                                            />
+                                            <input 
+                                                type="number"
+                                                placeholder="Reps" 
+                                                value={newSet.reps}
+                                                onChange={(e) => setNewSet({...newSet, reps: e.target.value})}
+                                                className="bg-[#0B0F15] border border-white/10 px-4 py-3 rounded-xl text-white placeholder-slate-500 font-semibold text-center"
+                                            />
+                                        </div>
+                                        <button 
+                                            onClick={addSet}
+                                            className="w-full bg-gradient-to-r from-red-600 to-red-700 hover:from-red-500 hover:to-red-600 py-3 sm:py-4 rounded-xl sm:rounded-2xl font-black uppercase text-xs sm:text-sm tracking-widest glow-red transition-all"
+                                        >
+                                            Save Set
+                                        </button>
                                     </div>
-                                    <button onClick={addSet} style={{ width: '100%', backgroundColor: '#dc2626', padding: '16px', borderRadius: '16px', color: 'white', fontWeight: 900, border: 'none', cursor: 'pointer', fontSize: '14px' }}>ADD SET</button>
                                 </div>
 
-                                <div style={{ backgroundColor: '#12161D', padding: '24px', borderRadius: '24px', border: '1px solid rgba(255,255,255,0.05)' }}>
-                                    <h3 style={{ fontSize: '12px', fontWeight: 900, color: '#dc2626', marginBottom: '16px' }}>YOUR SETS ({sets.length})</h3>
-                                    {sets.length === 0 ? (
-                                        <p style={{ color: '#64748b', fontSize: '14px' }}>No sets logged yet</p>
-                                    ) : (
-                                        sets.map(set => (
-                                            <div key={set.id} style={{ backgroundColor: '#0B0F15', padding: '12px', borderRadius: '12px', marginBottom: '8px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                                                <div>
-                                                    <div style={{ fontSize: '14px', fontWeight: 900 }}>{set.exercise}</div>
-                                                    <div style={{ fontSize: '12px', color: '#64748b' }}>{set.weight}kg × {set.reps} reps</div>
+                                {/* Sets List */}
+                                {sets.length > 0 && (
+                                    <div className="bg-[#12161D]/50 p-4 sm:p-6 rounded-2xl sm:rounded-3xl border border-white/5">
+                                        <h3 className="text-xs sm:text-sm font-black text-slate-400 mb-3 uppercase">📋 {sets.length} Set{sets.length !== 1 ? 's' : ''}</h3>
+                                        <div className="space-y-2">
+                                            {sets.map(set => (
+                                                <div key={set.id} className="bg-[#0B0F15] p-3 sm:p-4 rounded-xl flex justify-between items-center group hover:bg-[#12161D] transition-colors">
+                                                    <div className="flex-1">
+                                                        <div className="font-bold text-sm sm:text-base">{set.exercise}</div>
+                                                        <div className="text-xs sm:text-sm text-slate-400">{set.weight}kg × {set.reps} reps</div>
+                                                    </div>
+                                                    <button 
+                                                        onClick={() => deleteSet(set.id)}
+                                                        className="ml-2 p-2 sm:p-2.5 bg-red-600/20 hover:bg-red-600/40 rounded-lg text-red-400 transition-colors"
+                                                    >
+                                                        <Icon name="x" size={18} />
+                                                    </button>
                                                 </div>
-                                                <button 
-                                                    onClick={() => deleteSet(set.id)}
-                                                    style={{ backgroundColor: '#7f1d1d', border: '1px solid #dc2626', padding: '6px 10px', borderRadius: '6px', color: '#fca5a5', cursor: 'pointer', fontSize: '12px', fontWeight: 'bold' }}
-                                                >
-                                                    Delete
-                                                </button>
-                                            </div>
-                                        ))
-                                    )}
-                                </div>
+                                            ))}
+                                        </div>
+                                    </div>
+                                )}
                             </div>
                         )}
 
                         {activeTab === 'prs' && (
-                            <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-                                <div style={{ background: 'linear-gradient(to bottom right, #dc2626, #7f1d1d)', padding: '24px', borderRadius: '24px', border: '1px solid rgba(255,255,255,0.1)' }}>
-                                    <span style={{ fontSize: '12px', fontWeight: 900, color: 'rgba(255,255,255,0.6)' }}>PERSONAL RECORDS</span>
-                                    <div style={{ fontSize: '24px', fontWeight: 900, color: 'white', marginTop: '8px' }}>Total: {getPRs().length} exercises</div>
+                            <div className="space-y-4 animate-in fade-in">
+                                <div className="bg-gradient-to-br from-red-600/20 to-red-900/10 p-5 sm:p-6 rounded-2xl sm:rounded-3xl border border-red-600/30 backdrop-blur-sm">
+                                    <div className="text-xs sm:text-sm font-bold text-red-400 uppercase mb-2">🏆 Francis Score</div>
+                                    <div className="text-3xl sm:text-5xl font-black">{(getPRs().length * 280).toFixed(0)}</div>
+                                    <div className="text-xs sm:text-sm text-slate-400 mt-2">You're in the top {Math.max(50, 100 - getPRs().length * 10)}% of lifters!</div>
                                 </div>
+
                                 {getPRs().length === 0 ? (
-                                    <p style={{ color: '#64748b', fontSize: '14px' }}>Log some sets to see your PRs!</p>
+                                    <div className="bg-[#12161D]/50 p-6 rounded-2xl text-center text-slate-400">
+                                        📊 Log some sets to see your PRs!
+                                    </div>
                                 ) : (
                                     getPRs().map((pr, idx) => {
-                                        const rank = getRank(pr.exercise, pr.weight);
+                                        const rank = getRank(pr.exercise, parseFloat(pr.weight));
                                         return (
-                                            <div key={idx} style={{ backgroundColor: '#12161D', padding: '20px', borderRadius: '24px', border: '1px solid rgba(255,255,255,0.05)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                                                <div>
-                                                    <h3 style={{ fontSize: '12px', fontWeight: 900, color: '#64748b', marginBottom: '4px' }}>{pr.exercise.toUpperCase()}</h3>
-                                                    <div style={{ fontSize: '24px', fontWeight: 900, color: 'white' }}>{pr.weight}kg</div>
-                                                    <span style={{ fontSize: '12px', fontWeight: 900, color: rank.color }}>{rank.label}</span>
-                                                </div>
-                                                <div style={{ textAlign: 'right' }}>
-                                                    <div style={{ fontSize: '12px', color: '#64748b', fontWeight: 'bold', marginBottom: '4px' }}>PERCENTILE</div>
-                                                    <div style={{ fontSize: '20px', fontWeight: 900, color: 'white' }}>{rank.pct}%</div>
+                                            <div key={idx} className="bg-gradient-to-br from-[#12161D] to-[#0f1419] p-4 sm:p-6 rounded-2xl sm:rounded-3xl border border-white/5 hover:border-red-600/20 transition-colors">
+                                                <div className="flex justify-between items-start">
+                                                    <div>
+                                                        <div className="text-xs sm:text-sm font-bold text-slate-400 uppercase mb-1">{pr.exercise}</div>
+                                                        <div className="text-2xl sm:text-3xl font-black">{pr.weight}kg</div>
+                                                        <span className="text-xs sm:text-sm font-bold" style={{ color: rank.color }}>{rank.label}</span>
+                                                    </div>
+                                                    <Icon name="award" className="text-red-500 opacity-50" size={32} />
                                                 </div>
                                             </div>
                                         );
@@ -199,81 +368,115 @@
                         )}
 
                         {activeTab === 'calc' && (
-                            <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-                                <div style={{ backgroundColor: '#12161D', padding: '24px', borderRadius: '24px', border: '1px solid rgba(255,255,255,0.05)' }}>
-                                    <h2 style={{ fontSize: '12px', fontWeight: 900, color: '#dc2626', marginBottom: '16px' }}>1RM CALCULATOR</h2>
-                                    <p style={{ fontSize: '12px', color: '#64748b', marginBottom: '16px' }}>Use the famous equations: Brzycki, Epley, Lander</p>
-                                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', marginBottom: '16px' }}>
+                            <div className="space-y-4 animate-in fade-in">
+                                <div className="bg-gradient-to-br from-[#12161D] to-[#0f1419] p-5 sm:p-6 rounded-2xl sm:rounded-3xl border border-white/5">
+                                    <h2 className="text-xs sm:text-sm font-black uppercase tracking-widest text-red-500 mb-4">🧮 1RM Calculator</h2>
+                                    <div className="grid grid-cols-2 gap-3 mb-4">
                                         <input 
-                                            type="number" 
+                                            type="number"
                                             placeholder="Weight (kg)" 
                                             value={calcInput.weight}
                                             onChange={(e) => setCalcInput({...calcInput, weight: e.target.value})}
-                                            style={{ backgroundColor: '#0B0F15', border: '1px solid rgba(255,255,255,0.05)', padding: '16px', borderRadius: '16px', color: 'white', fontSize: '16px' }} 
+                                            className="bg-[#0B0F15] border border-white/10 px-4 py-3 rounded-xl text-white placeholder-slate-500 font-semibold"
                                         />
                                         <input 
-                                            type="number" 
+                                            type="number"
                                             placeholder="Reps" 
                                             value={calcInput.reps}
                                             onChange={(e) => setCalcInput({...calcInput, reps: e.target.value})}
-                                            style={{ backgroundColor: '#0B0F15', border: '1px solid rgba(255,255,255,0.05)', padding: '16px', borderRadius: '16px', color: 'white', fontSize: '16px' }} 
+                                            className="bg-[#0B0F15] border border-white/10 px-4 py-3 rounded-xl text-white placeholder-slate-500 font-semibold"
                                         />
                                     </div>
 
                                     {calculate1RM(calcInput.weight, calcInput.reps) && (
-                                        <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                                            <div style={{ backgroundColor: '#0B0F15', padding: '16px', borderRadius: '12px', border: '1px solid rgba(255,255,255,0.05)' }}>
-                                                <div style={{ fontSize: '12px', color: '#64748b', marginBottom: '4px' }}>BRZYCKI EQUATION</div>
-                                                <div style={{ fontSize: '24px', fontWeight: 900, color: '#dc2626' }}>{calculate1RM(calcInput.weight, calcInput.reps).brzycki}kg</div>
-                                            </div>
-                                            <div style={{ backgroundColor: '#0B0F15', padding: '16px', borderRadius: '12px', border: '1px solid rgba(255,255,255,0.05)' }}>
-                                                <div style={{ fontSize: '12px', color: '#64748b', marginBottom: '4px' }}>EPLEY EQUATION</div>
-                                                <div style={{ fontSize: '24px', fontWeight: 900, color: '#f97316' }}>{calculate1RM(calcInput.weight, calcInput.reps).epley}kg</div>
-                                            </div>
-                                            <div style={{ backgroundColor: '#0B0F15', padding: '16px', borderRadius: '12px', border: '1px solid rgba(255,255,255,0.05)' }}>
-                                                <div style={{ fontSize: '12px', color: '#64748b', marginBottom: '4px' }}>LANDER EQUATION</div>
-                                                <div style={{ fontSize: '24px', fontWeight: 900, color: '#eab308' }}>{calculate1RM(calcInput.weight, calcInput.reps).lander}kg</div>
-                                            </div>
-                                            <div style={{ backgroundColor: '#1a1a1a', padding: '16px', borderRadius: '12px', border: '2px solid #dc2626' }}>
-                                                <div style={{ fontSize: '12px', color: '#dc2626', marginBottom: '4px', fontWeight: 'bold' }}>AVERAGE (RECOMMENDED)</div>
-                                                <div style={{ fontSize: '28px', fontWeight: 900, color: 'white' }}>{calculate1RM(calcInput.weight, calcInput.reps).average}kg</div>
+                                        <div className="space-y-3">
+                                            {[
+                                                { name: 'Brzycki', value: calculate1RM(calcInput.weight, calcInput.reps).brzycki, color: 'from-red-600 to-red-700' },
+                                                { name: 'Epley', value: calculate1RM(calcInput.weight, calcInput.reps).epley, color: 'from-orange-600 to-orange-700' },
+                                                { name: 'Lander', value: calculate1RM(calcInput.weight, calcInput.reps).lander, color: 'from-yellow-600 to-yellow-700' },
+                                            ].map(eq => (
+                                                <div key={eq.name} className={`bg-gradient-to-r ${eq.color} p-4 rounded-xl`}>
+                                                    <div className="text-xs font-bold opacity-70 mb-1">{eq.name}</div>
+                                                    <div className="text-2xl font-black">{eq.value}kg</div>
+                                                </div>
+                                            ))}
+                                            <div className="bg-[#0B0F15] border-2 border-red-600/50 p-4 rounded-xl">
+                                                <div className="text-xs font-bold text-red-400 mb-1">RECOMMENDED (AVG)</div>
+                                                <div className="text-3xl font-black">{calculate1RM(calcInput.weight, calcInput.reps).average}kg</div>
                                             </div>
                                         </div>
                                     )}
                                 </div>
                             </div>
                         )}
+
+                        {activeTab === 'chat' && (
+                            <div className="space-y-4 animate-in fade-in">
+                                <div className="bg-[#12161D]/50 p-4 rounded-lg text-xs text-slate-400">
+                                    💡 Ask me about form, nutrition, PRs, recovery, or training!
+                                </div>
+                                <div className="space-y-3 h-96 overflow-y-auto scrollbar-hide">
+                                    {chatMessages.map((msg, idx) => (
+                                        <div key={idx} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
+                                            <div className={`max-w-xs sm:max-w-sm px-4 py-2 rounded-lg text-sm ${msg.role === 'user' ? 'bg-red-600 text-white' : 'bg-[#12161D] text-slate-100 border border-white/5'}`}>
+                                                {msg.text}
+                                            </div>
+                                        </div>
+                                    ))}
+                                    {loading && (
+                                        <div className="flex justify-start">
+                                            <div className="bg-[#12161D] px-4 py-2 rounded-lg text-slate-400 text-sm">
+                                                ⌛ Thinking...
+                                            </div>
+                                        </div>
+                                    )}
+                                    <div ref={chatEndRef} />
+                                </div>
+                            </div>
+                        )}
                     </main>
 
+                    {/* Chat Input */}
+                    {activeTab === 'chat' && (
+                        <div className="fixed bottom-20 sm:bottom-24 left-0 right-0 px-4 sm:px-6 py-2 max-w-2xl mx-auto w-full">
+                            <div className="flex gap-2">
+                                <input 
+                                    type="text"
+                                    placeholder="Ask me..." 
+                                    value={userInput}
+                                    onChange={(e) => setUserInput(e.target.value)}
+                                    onKeyPress={(e) => e.key === 'Enter' && sendMessage()}
+                                    className="flex-1 bg-[#12161D] border border-white/10 px-4 py-2 sm:py-3 rounded-lg text-sm text-white placeholder-slate-500"
+                                />
+                                <button 
+                                    onClick={sendMessage}
+                                    className="bg-red-600 hover:bg-red-700 p-2 sm:p-3 rounded-lg text-white transition-colors"
+                                >
+                                    <Icon name="send" size={18} />
+                                </button>
+                            </div>
+                        </div>
+                    )}
+
                     {/* Navigation */}
-                    <nav style={{ position: 'fixed', bottom: '24px', width: '90%', maxWidth: '500px', backgroundColor: 'rgba(18, 22, 29, 0.9)', backdropFilter: 'blur(12px)', border: '1px solid rgba(255,255,255,0.1)', padding: '8px', borderRadius: '24px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', zIndex: 50 }}>
-                        {[
-                            { id: 'diary', icon: 'book-open', label: 'Diary' },
-                            { id: 'prs', icon: 'award', label: 'PRs' },
-                            { id: 'calc', icon: 'calculator', label: 'Calc' }
-                        ].map(t => (
-                            <button
-                                key={t.id}
-                                onClick={() => setActiveTab(t.id)}
-                                style={{
-                                    flex: 1,
-                                    display: 'flex',
-                                    flexDirection: 'column',
-                                    alignItems: 'center',
-                                    gap: '4px',
-                                    padding: '12px',
-                                    borderRadius: '16px',
-                                    backgroundColor: activeTab === t.id ? '#dc2626' : 'transparent',
-                                    color: activeTab === t.id ? 'white' : '#64748b',
-                                    border: 'none',
-                                    cursor: 'pointer',
-                                    transition: 'all 0.2s'
-                                }}
-                            >
-                                <svg style={{ width: 18, height: 18 }} data-lucide={t.icon} stroke="currentColor" strokeWidth="2" fill="none" strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24"></svg>
-                                <span style={{ fontSize: '8px', fontWeight: 900 }}>{t.label}</span>
-                            </button>
-                        ))}
+                    <nav className="fixed bottom-0 left-0 right-0 bg-gradient-to-t from-[#07090C] to-transparent backdrop-blur-lg border-t border-white/5 px-4 sm:px-6 py-2 sm:py-3">
+                        <div className="flex justify-around max-w-2xl mx-auto">
+                            {[
+                                { id: 'diary', icon: 'book-open', label: 'Diary', emoji: '📝' },
+                                { id: 'prs', icon: 'target', label: 'PRs', emoji: '🏆' },
+                                { id: 'calc', icon: 'calculator', label: 'Calc', emoji: '🧮' },
+                                { id: 'chat', icon: 'message-circle', label: 'Chat', emoji: '💬' }
+                            ].map(t => (
+                                <button
+                                    key={t.id}
+                                    onClick={() => setActiveTab(t.id)}
+                                    className={`flex-1 py-2 sm:py-3 flex flex-col items-center gap-1 rounded-xl transition-all ${activeTab === t.id ? 'bg-red-600/20 text-red-500' : 'text-slate-500 hover:text-slate-300'}`}
+                                >
+                                    <Icon name={t.icon} size={20} />
+                                    <span className="text-[10px] sm:text-xs font-bold uppercase">{t.label}</span>
+                                </button>
+                            ))}
+                        </div>
                     </nav>
                 </div>
             );
