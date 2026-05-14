@@ -27,18 +27,32 @@
 
         function App() {
             const [activeTab, setActiveTab] = useState('diary');
-            const [profile] = useState({ weight: 85 });
-            const [records] = useState([
-                { exercise: 'Bench Press', weight: 100 },
-                { exercise: 'Deadlift', weight: 180 },
-                { exercise: 'Squat', weight: 140 }
+            const [profile, setProfile] = useState({ weight: 85 });
+            const [sets, setSets] = useState([
+                { id: 1, exercise: 'Bench Press', weight: 100, reps: 5 },
+                { id: 2, exercise: 'Deadlift', weight: 180, reps: 3 },
+                { id: 3, exercise: 'Squat', weight: 140, reps: 5 }
             ]);
+            const [newSet, setNewSet] = useState({ exercise: '', weight: '', reps: '' });
+            const [calcInput, setCalcInput] = useState({ weight: '', reps: '' });
 
-            useEffect(() => {
-                setTimeout(() => {
-                    if (window.lucide) lucide.createIcons();
-                }, 100);
-            }, [activeTab]);
+            // Calculate 1RM using different equations
+            const calculate1RM = (weight, reps) => {
+                if (!weight || !reps || reps < 1) return null;
+                weight = parseFloat(weight);
+                reps = parseInt(reps);
+
+                const brzycki = weight * (36 / (37 - reps));
+                const epley = weight * (1 + reps / 30);
+                const lander = (100 * weight) / (101.3 - 2.67123 * reps);
+
+                return {
+                    brzycki: brzycki.toFixed(1),
+                    epley: epley.toFixed(1),
+                    lander: lander.toFixed(1),
+                    average: ((brzycki + epley + lander) / 3).toFixed(1)
+                };
+            };
 
             const getRank = (ex, w) => {
                 const ratio = w / profile.weight;
@@ -55,6 +69,38 @@
                 return { label: 'INTERMEDIATE', color: '#eab308', pct: 50 };
             };
 
+            const addSet = () => {
+                if (newSet.exercise && newSet.weight && newSet.reps) {
+                    setSets([...sets, {
+                        id: Date.now(),
+                        exercise: newSet.exercise,
+                        weight: parseFloat(newSet.weight),
+                        reps: parseInt(newSet.reps)
+                    }]);
+                    setNewSet({ exercise: '', weight: '', reps: '' });
+                }
+            };
+
+            const deleteSet = (id) => {
+                setSets(sets.filter(s => s.id !== id));
+            };
+
+            const clearAllData = () => {
+                if (window.confirm('Clear all sets and PRs? This cannot be undone!')) {
+                    setSets([]);
+                }
+            };
+
+            const getPRs = () => {
+                const exercises = {};
+                sets.forEach(set => {
+                    if (!exercises[set.exercise] || set.weight > exercises[set.exercise].weight) {
+                        exercises[set.exercise] = set;
+                    }
+                });
+                return Object.values(exercises);
+            };
+
             return (
                 <div style={{ minHeight: '100vh', paddingBottom: '120px', display: 'flex', flexDirection: 'column', alignItems: 'center', backgroundColor: '#07090C' }}>
                     {/* Header */}
@@ -65,46 +111,136 @@
                             </div>
                             <h1 style={{ fontSize: '20px', fontWeight: 900, color: 'white' }}>FRANCIS <span style={{ color: '#dc2626' }}>LIFTS</span></h1>
                         </div>
-                        <svg style={{ width: 20, height: 20, color: '#64748b' }} data-lucide="user" stroke="currentColor" strokeWidth="2" fill="none" strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle></svg>
+                        <button onClick={clearAllData} style={{ backgroundColor: '#7f1d1d', border: '1px solid #dc2626', padding: '8px 12px', borderRadius: '8px', color: '#fca5a5', cursor: 'pointer', fontSize: '12px', fontWeight: 'bold' }} title="Clear all data">🗑️</button>
                     </header>
 
                     {/* Main Content */}
                     <main style={{ width: '100%', maxWidth: '500px', padding: '0 16px', marginTop: '24px' }}>
                         {activeTab === 'diary' && (
-                            <div style={{ backgroundColor: '#12161D', padding: '24px', borderRadius: '24px', border: '1px solid rgba(255,255,255,0.05)' }}>
-                                <h2 style={{ fontSize: '12px', fontWeight: 900, color: '#dc2626', marginBottom: '16px' }}>LOG WORKOUT</h2>
-                                <input placeholder="Exercise" style={{ width: '100%', backgroundColor: '#0B0F15', border: '1px solid rgba(255,255,255,0.05)', padding: '16px', borderRadius: '16px', color: 'white', marginBottom: '16px', fontSize: '16px' }} />
-                                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', marginBottom: '16px' }}>
-                                    <input type="number" placeholder="Weight (kg)" style={{ backgroundColor: '#0B0F15', border: '1px solid rgba(255,255,255,0.05)', padding: '16px', borderRadius: '16px', color: 'white', fontSize: '16px', textAlign: 'center' }} />
-                                    <input type="number" placeholder="Reps" style={{ backgroundColor: '#0B0F15', border: '1px solid rgba(255,255,255,0.05)', padding: '16px', borderRadius: '16px', color: 'white', fontSize: '16px', textAlign: 'center' }} />
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                                <div style={{ backgroundColor: '#12161D', padding: '24px', borderRadius: '24px', border: '1px solid rgba(255,255,255,0.05)' }}>
+                                    <h2 style={{ fontSize: '12px', fontWeight: 900, color: '#dc2626', marginBottom: '16px' }}>LOG WORKOUT</h2>
+                                    <input 
+                                        placeholder="Exercise" 
+                                        value={newSet.exercise}
+                                        onChange={(e) => setNewSet({...newSet, exercise: e.target.value})}
+                                        style={{ width: '100%', backgroundColor: '#0B0F15', border: '1px solid rgba(255,255,255,0.05)', padding: '16px', borderRadius: '16px', color: 'white', marginBottom: '16px', fontSize: '16px' }} 
+                                    />
+                                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', marginBottom: '16px' }}>
+                                        <input 
+                                            type="number" 
+                                            placeholder="Weight (kg)" 
+                                            value={newSet.weight}
+                                            onChange={(e) => setNewSet({...newSet, weight: e.target.value})}
+                                            style={{ backgroundColor: '#0B0F15', border: '1px solid rgba(255,255,255,0.05)', padding: '16px', borderRadius: '16px', color: 'white', fontSize: '16px', textAlign: 'center' }} 
+                                        />
+                                        <input 
+                                            type="number" 
+                                            placeholder="Reps" 
+                                            value={newSet.reps}
+                                            onChange={(e) => setNewSet({...newSet, reps: e.target.value})}
+                                            style={{ backgroundColor: '#0B0F15', border: '1px solid rgba(255,255,255,0.05)', padding: '16px', borderRadius: '16px', color: 'white', fontSize: '16px', textAlign: 'center' }} 
+                                        />
+                                    </div>
+                                    <button onClick={addSet} style={{ width: '100%', backgroundColor: '#dc2626', padding: '16px', borderRadius: '16px', color: 'white', fontWeight: 900, border: 'none', cursor: 'pointer', fontSize: '14px' }}>ADD SET</button>
                                 </div>
-                                <button style={{ width: '100%', backgroundColor: '#dc2626', padding: '16px', borderRadius: '16px', color: 'white', fontWeight: 900, border: 'none', cursor: 'pointer', fontSize: '14px' }}>SAVE</button>
+
+                                <div style={{ backgroundColor: '#12161D', padding: '24px', borderRadius: '24px', border: '1px solid rgba(255,255,255,0.05)' }}>
+                                    <h3 style={{ fontSize: '12px', fontWeight: 900, color: '#dc2626', marginBottom: '16px' }}>YOUR SETS ({sets.length})</h3>
+                                    {sets.length === 0 ? (
+                                        <p style={{ color: '#64748b', fontSize: '14px' }}>No sets logged yet</p>
+                                    ) : (
+                                        sets.map(set => (
+                                            <div key={set.id} style={{ backgroundColor: '#0B0F15', padding: '12px', borderRadius: '12px', marginBottom: '8px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                                <div>
+                                                    <div style={{ fontSize: '14px', fontWeight: 900 }}>{set.exercise}</div>
+                                                    <div style={{ fontSize: '12px', color: '#64748b' }}>{set.weight}kg × {set.reps} reps</div>
+                                                </div>
+                                                <button 
+                                                    onClick={() => deleteSet(set.id)}
+                                                    style={{ backgroundColor: '#7f1d1d', border: '1px solid #dc2626', padding: '6px 10px', borderRadius: '6px', color: '#fca5a5', cursor: 'pointer', fontSize: '12px', fontWeight: 'bold' }}
+                                                >
+                                                    Delete
+                                                </button>
+                                            </div>
+                                        ))
+                                    )}
+                                </div>
                             </div>
                         )}
 
                         {activeTab === 'prs' && (
                             <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
                                 <div style={{ background: 'linear-gradient(to bottom right, #dc2626, #7f1d1d)', padding: '24px', borderRadius: '24px', border: '1px solid rgba(255,255,255,0.1)' }}>
-                                    <span style={{ fontSize: '12px', fontWeight: 900, color: 'rgba(255,255,255,0.6)' }}>FRANCIS SCORE</span>
-                                    <div style={{ fontSize: '36px', fontWeight: 900, color: 'white', marginTop: '8px' }}>842</div>
-                                    <p style={{ fontSize: '12px', color: 'rgba(255,255,255,0.5)', marginTop: '8px' }}>You're stronger than 78% of people</p>
+                                    <span style={{ fontSize: '12px', fontWeight: 900, color: 'rgba(255,255,255,0.6)' }}>PERSONAL RECORDS</span>
+                                    <div style={{ fontSize: '24px', fontWeight: 900, color: 'white', marginTop: '8px' }}>Total: {getPRs().length} exercises</div>
                                 </div>
-                                {records.map((r, idx) => {
-                                    const rank = getRank(r.exercise, r.weight);
-                                    return (
-                                        <div key={idx} style={{ backgroundColor: '#12161D', padding: '20px', borderRadius: '24px', border: '1px solid rgba(255,255,255,0.05)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                                            <div>
-                                                <h3 style={{ fontSize: '12px', fontWeight: 900, color: '#64748b', marginBottom: '4px' }}>{r.exercise.toUpperCase()}</h3>
-                                                <div style={{ fontSize: '24px', fontWeight: 900, color: 'white' }}>{r.weight}kg</div>
-                                                <span style={{ fontSize: '12px', fontWeight: 900, color: rank.color }}>{rank.label}</span>
+                                {getPRs().length === 0 ? (
+                                    <p style={{ color: '#64748b', fontSize: '14px' }}>Log some sets to see your PRs!</p>
+                                ) : (
+                                    getPRs().map((pr, idx) => {
+                                        const rank = getRank(pr.exercise, pr.weight);
+                                        return (
+                                            <div key={idx} style={{ backgroundColor: '#12161D', padding: '20px', borderRadius: '24px', border: '1px solid rgba(255,255,255,0.05)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                                <div>
+                                                    <h3 style={{ fontSize: '12px', fontWeight: 900, color: '#64748b', marginBottom: '4px' }}>{pr.exercise.toUpperCase()}</h3>
+                                                    <div style={{ fontSize: '24px', fontWeight: 900, color: 'white' }}>{pr.weight}kg</div>
+                                                    <span style={{ fontSize: '12px', fontWeight: 900, color: rank.color }}>{rank.label}</span>
+                                                </div>
+                                                <div style={{ textAlign: 'right' }}>
+                                                    <div style={{ fontSize: '12px', color: '#64748b', fontWeight: 'bold', marginBottom: '4px' }}>PERCENTILE</div>
+                                                    <div style={{ fontSize: '20px', fontWeight: 900, color: 'white' }}>{rank.pct}%</div>
+                                                </div>
                                             </div>
-                                            <div style={{ textAlign: 'right' }}>
-                                                <div style={{ fontSize: '12px', color: '#64748b', fontWeight: 'bold', marginBottom: '4px' }}>PERCENTILE</div>
-                                                <div style={{ fontSize: '20px', fontWeight: 900, color: 'white' }}>{rank.pct}%</div>
+                                        );
+                                    })
+                                )}
+                            </div>
+                        )}
+
+                        {activeTab === 'calc' && (
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                                <div style={{ backgroundColor: '#12161D', padding: '24px', borderRadius: '24px', border: '1px solid rgba(255,255,255,0.05)' }}>
+                                    <h2 style={{ fontSize: '12px', fontWeight: 900, color: '#dc2626', marginBottom: '16px' }}>1RM CALCULATOR</h2>
+                                    <p style={{ fontSize: '12px', color: '#64748b', marginBottom: '16px' }}>Use the famous equations: Brzycki, Epley, Lander</p>
+                                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', marginBottom: '16px' }}>
+                                        <input 
+                                            type="number" 
+                                            placeholder="Weight (kg)" 
+                                            value={calcInput.weight}
+                                            onChange={(e) => setCalcInput({...calcInput, weight: e.target.value})}
+                                            style={{ backgroundColor: '#0B0F15', border: '1px solid rgba(255,255,255,0.05)', padding: '16px', borderRadius: '16px', color: 'white', fontSize: '16px' }} 
+                                        />
+                                        <input 
+                                            type="number" 
+                                            placeholder="Reps" 
+                                            value={calcInput.reps}
+                                            onChange={(e) => setCalcInput({...calcInput, reps: e.target.value})}
+                                            style={{ backgroundColor: '#0B0F15', border: '1px solid rgba(255,255,255,0.05)', padding: '16px', borderRadius: '16px', color: 'white', fontSize: '16px' }} 
+                                        />
+                                    </div>
+
+                                    {calculate1RM(calcInput.weight, calcInput.reps) && (
+                                        <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                                            <div style={{ backgroundColor: '#0B0F15', padding: '16px', borderRadius: '12px', border: '1px solid rgba(255,255,255,0.05)' }}>
+                                                <div style={{ fontSize: '12px', color: '#64748b', marginBottom: '4px' }}>BRZYCKI EQUATION</div>
+                                                <div style={{ fontSize: '24px', fontWeight: 900, color: '#dc2626' }}>{calculate1RM(calcInput.weight, calcInput.reps).brzycki}kg</div>
+                                            </div>
+                                            <div style={{ backgroundColor: '#0B0F15', padding: '16px', borderRadius: '12px', border: '1px solid rgba(255,255,255,0.05)' }}>
+                                                <div style={{ fontSize: '12px', color: '#64748b', marginBottom: '4px' }}>EPLEY EQUATION</div>
+                                                <div style={{ fontSize: '24px', fontWeight: 900, color: '#f97316' }}>{calculate1RM(calcInput.weight, calcInput.reps).epley}kg</div>
+                                            </div>
+                                            <div style={{ backgroundColor: '#0B0F15', padding: '16px', borderRadius: '12px', border: '1px solid rgba(255,255,255,0.05)' }}>
+                                                <div style={{ fontSize: '12px', color: '#64748b', marginBottom: '4px' }}>LANDER EQUATION</div>
+                                                <div style={{ fontSize: '24px', fontWeight: 900, color: '#eab308' }}>{calculate1RM(calcInput.weight, calcInput.reps).lander}kg</div>
+                                            </div>
+                                            <div style={{ backgroundColor: '#1a1a1a', padding: '16px', borderRadius: '12px', border: '2px solid #dc2626' }}>
+                                                <div style={{ fontSize: '12px', color: '#dc2626', marginBottom: '4px', fontWeight: 'bold' }}>AVERAGE (RECOMMENDED)</div>
+                                                <div style={{ fontSize: '28px', fontWeight: 900, color: 'white' }}>{calculate1RM(calcInput.weight, calcInput.reps).average}kg</div>
                                             </div>
                                         </div>
-                                    );
-                                })}
+                                    )}
+                                </div>
                             </div>
                         )}
                     </main>
@@ -112,9 +248,8 @@
                     {/* Navigation */}
                     <nav style={{ position: 'fixed', bottom: '24px', width: '90%', maxWidth: '500px', backgroundColor: 'rgba(18, 22, 29, 0.9)', backdropFilter: 'blur(12px)', border: '1px solid rgba(255,255,255,0.1)', padding: '8px', borderRadius: '24px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', zIndex: 50 }}>
                         {[
-                            { id: 'diary', icon: 'history', label: 'Diary' },
+                            { id: 'diary', icon: 'book-open', label: 'Diary' },
                             { id: 'prs', icon: 'award', label: 'PRs' },
-                            { id: 'ai', icon: 'message-square', label: 'Coach' },
                             { id: 'calc', icon: 'calculator', label: 'Calc' }
                         ].map(t => (
                             <button
