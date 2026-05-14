@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Francis Lifts - Fitness App</title>
+    <title>Francis Lifts - Elite Edition</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://unpkg.com/react@18/umd/react.development.js"></script>
     <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
@@ -12,52 +12,95 @@
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;900&display=swap');
         
-        * { margin: 0; padding: 0; box-sizing: border-box; }
-        
         body { 
-            font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-            background: #07090C;
+            font-family: 'Inter', sans-serif;
+            background: #05070A;
             color: white;
-            overflow-x: hidden;
             -webkit-tap-highlight-color: transparent;
+            overflow-x: hidden;
         }
 
-        .scrollbar-hide::-webkit-scrollbar { display: none; }
-        .scrollbar-hide { -ms-overflow-style: none; scrollbar-width: none; }
-        
         .gradient-text {
             background: linear-gradient(135deg, #dc2626 0%, #f97316 100%);
             -webkit-background-clip: text;
             -webkit-text-fill-color: transparent;
         }
 
-        .glow-red {
-            box-shadow: 0 0 20px rgba(220, 38, 38, 0.3);
+        .glow-red { box-shadow: 0 0 25px rgba(220, 38, 38, 0.25); }
+        .scrollbar-hide::-webkit-scrollbar { display: none; }
+
+        .day-node {
+            aspect-ratio: 1/1;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            border-radius: 16px;
+            cursor: pointer;
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
         }
 
-        .card-enter {
-            animation: slideUp 0.3s ease-out forwards;
+        .day-active {
+            background: linear-gradient(135deg, #dc2626, #991b1b) !important;
+            color: white !important;
+            transform: translateY(-4px);
+            box-shadow: 0 10px 20px rgba(220, 38, 38, 0.3);
         }
 
-        @keyframes slideUp {
-            from { opacity: 0; transform: translateY(10px); }
-            to { opacity: 1; transform: translateY(0); }
+        .glass {
+            background: rgba(255, 255, 255, 0.03);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.05);
         }
 
-        .tab-transition {
-            transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+        .side-menu {
+            position: fixed;
+            top: 0;
+            left: 0;
+            height: 100%;
+            width: 85%;
+            max-width: 320px;
+            background: #0A0D12;
+            z-index: 200;
+            transform: translateX(-100%);
+            transition: transform 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+            border-right: 1px solid rgba(255,255,255,0.05);
+            display: flex;
+            flex-direction: column;
         }
 
-        input:focus {
-            border-color: #dc2626 !important;
-            outline: none;
-            box-shadow: 0 0 0 2px rgba(220, 38, 38, 0.2);
-        }
+        .side-menu.open { transform: translateX(0); }
 
-        .calendar-day-active {
-            background: #dc2626;
-            color: white;
-            box-shadow: 0 0 10px rgba(220, 38, 38, 0.5);
+        .overlay {
+            position: fixed;
+            inset: 0;
+            background: rgba(0,0,0,0.7);
+            backdrop-filter: blur(8px);
+            z-index: 150;
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.4s;
+        }
+        .overlay.open { opacity: 1; pointer-events: auto; }
+
+        input, select {
+            background: rgba(255,255,255,0.05) !important;
+            border: 1px solid rgba(255,255,255,0.1) !important;
+            color: white !important;
+        }
+        
+        input:focus { border-color: #dc2626 !important; outline: none; }
+
+        @keyframes pulse-red {
+            0% { transform: scale(1); opacity: 1; }
+            50% { transform: scale(1.05); opacity: 0.8; }
+            100% { transform: scale(1); opacity: 1; }
+        }
+        .timer-active { animation: pulse-red 1s infinite; }
+
+        ::-webkit-calendar-picker-indicator {
+            filter: invert(1);
+            cursor: pointer;
         }
     </style>
 </head>
@@ -67,375 +110,449 @@
     <script type="text/babel">
         const { useState, useEffect, useRef, useMemo } = React;
 
+        // Funkce pro získání dnů v aktuálním týdnu (začíná pondělím)
+        const getWeekDays = (date) => {
+            const start = new Date(date);
+            const day = start.getDay();
+            const diff = start.getDate() - day + (day === 0 ? -6 : 1);
+            const monday = new Date(start.setDate(diff));
+            
+            return Array.from({ length: 7 }, (_, i) => {
+                const d = new Date(monday);
+                d.setDate(monday.getDate() + i);
+                return d;
+            });
+        };
+
+        // Funkce pro určení kategorie BMI
+        const bmiCategory = (bmi) => {
+            const val = parseFloat(bmi);
+            if (val < 18.5) return { label: "Podváha", color: "text-blue-400" };
+            if (val < 25) return { label: "Normální", color: "text-emerald-400" };
+            if (val < 30) return { label: "Nadváha", color: "text-yellow-400" };
+            return { label: "Obezita", color: "text-red-500" };
+        };
+
         const Icon = ({ name, size = 20, className = "" }) => {
             useEffect(() => {
                 if (window.lucide) window.lucide.createIcons();
-            }, [name]);
+            }, [name, className]);
             return <i data-lucide={name} className={className} style={{ width: size, height: size }}></i>;
         };
 
-        const TRAINING_PLAN = {
-            1: { name: "Pondělí", focus: "Záda / Biceps", icon: "dumbbell" },
-            2: { name: "Úterý", focus: "Nohy", icon: "activity" },
-            3: { name: "Středa", focus: "Hrudník / Ramena", icon: "zap" },
-            4: { name: "Čtvrtek", focus: "Záda", icon: "dumbbell" },
-            5: { name: "Pátek", focus: "Nohy", icon: "activity" },
-            6: { name: "Sobota", focus: "Rest Day", icon: "coffee" },
-            0: { name: "Neděle", focus: "Hrudník / Triceps", icon: "zap" }
+        const TRAINING_SPLIT = {
+            1: { name: "Pondělí", focus: "Záda / Biceps" },
+            2: { name: "Úterý", focus: "Nohy" },
+            3: { name: "Středa", focus: "Hrudník / Ramena" },
+            4: { name: "Čtvrtek", focus: "Záda" },
+            5: { name: "Pátek", focus: "Nohy" },
+            6: { name: "Sobota", focus: "Rest Day" },
+            0: { name: "Neděle", focus: "Hrudník / Triceps" }
         };
 
         function App() {
+            const [activeTab, setActiveTab] = useState('diary');
+            const [selectedDate, setSelectedDate] = useState(new Date());
+            const [timer, setTimer] = useState(null);
+            const [isMenuOpen, setIsMenuOpen] = useState(false);
+            
+            const [calcWeight, setCalcWeight] = useState('');
+            const [calcReps, setCalcReps] = useState('');
+            
+            const [profile, setProfile] = useState(() => {
+                const saved = localStorage.getItem('francis_profile');
+                return saved ? JSON.parse(saved) : { weight: 85, height: 180, age: 25 };
+            });
+
             const [sets, setSets] = useState(() => {
-                const saved = localStorage.getItem('francis_sets');
+                const saved = localStorage.getItem('francis_pro_sets');
                 return saved ? JSON.parse(saved) : [];
             });
-            const [userWeight, setUserWeight] = useState(() => {
-                const saved = localStorage.getItem('francis_user_weight');
-                return saved ? parseFloat(saved) : 80;
-            });
 
-            const [activeTab, setActiveTab] = useState('diary');
             const [newSet, setNewSet] = useState({ exercise: '', weight: '', reps: '' });
-            const [calcInput, setCalcInput] = useState({ weight: '', reps: '' });
-            const [chatMessages, setChatMessages] = useState([
-                { role: 'ai', text: 'Zdar! Jsem tvůj virtuální kouč. Potřebuješ poradit s technikou, tréninkem nebo stravou? 💪' }
-            ]);
-            const [userInput, setUserInput] = useState('');
-            const [isThinking, setIsThinking] = useState(false);
-            const chatEndRef = useRef(null);
 
             useEffect(() => {
-                localStorage.setItem('francis_sets', JSON.stringify(sets));
-            }, [sets]);
+                localStorage.setItem('francis_pro_sets', JSON.stringify(sets));
+                localStorage.setItem('francis_profile', JSON.stringify(profile));
+            }, [sets, profile]);
 
             useEffect(() => {
-                localStorage.setItem('francis_user_weight', userWeight.toString());
-            }, [userWeight]);
+                let interval;
+                if (timer > 0) {
+                    interval = setInterval(() => setTimer(t => t - 1), 1000);
+                } else if (timer === 0) {
+                    setTimer(null);
+                }
+                return () => clearInterval(interval);
+            }, [timer]);
 
-            useEffect(() => {
-                chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-            }, [chatMessages, isThinking]);
+            const bmi = useMemo(() => {
+                const hMeters = profile.height / 100;
+                return (profile.weight / (hMeters * hMeters)).toFixed(1);
+            }, [profile]);
+            const weekDays = useMemo(() => getWeekDays(selectedDate), [selectedDate.toDateString()]);
+            
+            const filteredSets = useMemo(() => {
+                return sets.filter(s => {
+                    const setDate = new Date(s.date);
+                    return setDate.toDateString() === selectedDate.toDateString();
+                });
+            }, [sets, selectedDate]);
 
             const addSet = () => {
-                if (newSet.exercise && newSet.weight && newSet.reps) {
-                    setSets([{ id: Date.now(), ...newSet, date: new Date().toISOString() }, ...sets]);
-                    setNewSet({ ...newSet, weight: '', reps: '' }); 
-                }
+                if (!newSet.exercise || !newSet.weight || !newSet.reps) return;
+                // Ukládáme přesný čas pro řazení, ale pro filtrování používáme vybraný den
+                const setWithDate = { 
+                    ...newSet, 
+                    id: Date.now(), 
+                    date: selectedDate.toISOString() 
+                };
+                setSets([setWithDate, ...sets]);
+                setNewSet({ ...newSet, weight: '', reps: '' });
+                // Spustit timer automaticky po uložení (např. 90s)
+                setTimer(90);
             };
 
-            const deleteSet = (id) => {
-                setSets(sets.filter(s => s.id !== id));
-            };
-
-            const clearAll = () => {
-                if (confirm('Opravdu chceš smazat všechnu historii?')) {
-                    setSets([]);
-                }
-            };
-
-            const today = new Date().getDay();
-            const todayPlan = TRAINING_PLAN[today];
-
-            const prs = useMemo(() => {
-                const bests = {};
-                sets.forEach(s => {
-                    const weight = parseFloat(s.weight);
-                    if (!bests[s.exercise] || weight > parseFloat(bests[s.exercise].weight)) {
-                        bests[s.exercise] = s;
-                    }
-                });
-                return Object.values(bests);
-            }, [sets]);
-
-            const totalVolume = useMemo(() => {
-                return sets.reduce((acc, s) => acc + (parseFloat(s.weight) * parseInt(s.reps)), 0);
-            }, [sets]);
-
-            const calculate1RM = (w, r) => {
-                if (!w || !r || r < 1) return null;
-                const weight = parseFloat(w);
-                const reps = parseInt(r);
-                return (weight * (1 + reps / 30)).toFixed(1); 
-            };
-
-            const getRank = (ex, w) => {
-                const ratio = w / userWeight;
-                const lowerEx = ex.toLowerCase();
-                if (lowerEx.includes('bench')) {
-                    if (ratio > 1.5) return { label: 'ELITE ⚡', color: 'text-red-500' };
-                    if (ratio > 1.2) return { label: 'POKROČILÝ 🔥', color: 'text-orange-500' };
-                    return { label: 'ZAČÁTEČNÍK 💪', color: 'text-yellow-500' };
-                }
-                if (lowerEx.includes('deadlift') || lowerEx.includes('mrtv')) {
-                    if (ratio > 2.5) return { label: 'ELITE ⚡', color: 'text-red-500' };
-                    if (ratio > 2.0) return { label: 'POKROČILÝ 🔥', color: 'text-orange-500' };
-                    return { label: 'ZAČÁTEČNÍK 💪', color: 'text-yellow-500' };
-                }
-                return { label: 'DOBRÁ PRÁCE 👊', color: 'text-blue-500' };
-            };
-
-            const handleChat = () => {
-                if (!userInput.trim()) return;
-                const msg = userInput.toLowerCase();
-                setChatMessages(prev => [...prev, { role: 'user', text: userInput }]);
-                setUserInput('');
-                setIsThinking(true);
-
-                setTimeout(() => {
-                    let reply = "Zajímavý dotaz! Zkus se zeptat konkrétněji na techniku dřepu, mrtvého tahu nebo jak nastavit bílkoviny.";
-                    
-                    if (msg.includes("bench")) reply = "U bench-pressu hlídej 'arch' (mírné prohnutí), lopatky u sebe a lokty nepouštěj příliš kolmo k tělu, spíše mírně k pasu. 3-5 minut pauza mezi těžkými sety!";
-                    if (msg.includes("mrtv") || msg.includes("deadlift")) reply = "Mrtvý tah je o tlaku nohama do země, ne o tahání zády. Před odlepením osy se pořádně 'zpevni' (bracing) a nadechni do břicha.";
-                    if (msg.includes("jist") || msg.includes("strava") || msg.includes("protein")) reply = "Základ je 1.6 - 2.2g bílkovin na kilo váhy. Pokud chceš nabírat, jez o 300 kcal víc, než vydáš. Spánek 7-9h je nejdůležitější suplement!";
-                    if (msg.includes("zhubnout")) reply = "Hubnutí je o kalorickém deficitu. Počítej si makra, hýbej se a hlavně nevynechávej silový trénink, ať pálíš tuk a ne svaly.";
-                    if (msg.includes("plán") || msg.includes("dnes")) reply = `Dnes je ${todayPlan.name} a podle plánu máš na programu: ${todayPlan.focus}. Rozdrť to! 💪`;
-                    
-                    setChatMessages(prev => [...prev, { role: 'ai', text: reply }]);
-                    setIsThinking(false);
-                }, 800);
-            };
+            const oneRepMax = useMemo(() => {
+                const w = parseFloat(calcWeight);
+                const r = parseFloat(calcReps);
+                if (!w || !r) return 0;
+                if (r === 1) return w;
+                // Epley Formula: 1RM = w * (1 + r/30)
+                return Math.round(w * (1 + r / 30));
+            }, [calcWeight, calcReps]);
 
             return (
-                <div className="min-h-screen flex flex-col max-w-2xl mx-auto border-x border-white/5 shadow-2xl bg-[#07090C]">
-                    <header className="p-6 flex justify-between items-center bg-black/40 backdrop-blur-md sticky top-0 z-50 border-b border-white/5">
-                        <div className="flex items-center gap-3">
-                            <div className="p-2 bg-red-600 rounded-lg glow-red">
-                                <Icon name="zap" size={20} className="fill-white" />
+                <div className="min-h-screen bg-[#05070A] flex flex-col max-w-md mx-auto relative pb-28">
+                    
+                    {/* Overlay */}
+                    <div className={`overlay ${isMenuOpen ? 'open' : ''}`} onClick={() => setIsMenuOpen(false)}></div>
+                    
+                    {/* Side Menu */}
+                    <aside className={`side-menu ${isMenuOpen ? 'open' : ''} p-6 overflow-y-auto scrollbar-hide`}>
+                        <div className="flex items-center justify-between mb-8">
+                            <div className="flex items-center gap-3">
+                                <div className="w-10 h-10 bg-red-600 rounded-xl flex items-center justify-center glow-red">
+                                    <Icon name="user" size={20} />
+                                </div>
+                                <span className="font-black text-lg uppercase tracking-tight italic">Profil</span>
                             </div>
-                            <h1 className="text-xl font-black italic tracking-tighter uppercase">FRANCIS <span className="gradient-text">LIFTS</span></h1>
+                            <button onClick={() => setIsMenuOpen(false)} className="text-white/40"><Icon name="x" size={24} /></button>
                         </div>
-                        <div className="flex items-center gap-4">
-                            <button onClick={clearAll} className="p-2 text-slate-500 hover:text-red-500 transition-colors">
-                                <Icon name="trash-2" size={20} />
+                        
+                        <div className="space-y-6">
+                            {/* Personal Details */}
+                            <div className="space-y-4 bg-white/5 p-5 rounded-3xl border border-white/5">
+                                <div className="grid grid-cols-2 gap-4">
+                                    <div className="space-y-1">
+                                        <label className="text-[10px] font-black uppercase text-white/30 tracking-widest px-1">Věk</label>
+                                        <input 
+                                            type="number" value={profile.age} 
+                                            onChange={e => setProfile({...profile, age: e.target.value})}
+                                            className="w-full p-3 rounded-xl font-bold"
+                                        />
+                                    </div>
+                                    <div className="space-y-1">
+                                        <label className="text-[10px] font-black uppercase text-white/30 tracking-widest px-1">Váha (kg)</label>
+                                        <input 
+                                            type="number" value={profile.weight} 
+                                            onChange={e => setProfile({...profile, weight: e.target.value})}
+                                            className="w-full p-3 rounded-xl font-bold"
+                                        />
+                                    </div>
+                                </div>
+                                <div className="space-y-1">
+                                    <label className="text-[10px] font-black uppercase text-white/30 tracking-widest px-1">Výška (cm)</label>
+                                    <input 
+                                        type="number" value={profile.height} 
+                                        onChange={e => setProfile({...profile, height: e.target.value})}
+                                        className="w-full p-3 rounded-xl font-bold"
+                                    />
+                                </div>
+                            </div>
+
+                            {/* BMI Analysis */}
+                            <div className="glass p-5 rounded-3xl flex items-center justify-between">
+                                <div>
+                                    <div className="text-[10px] font-black uppercase text-white/30 mb-1">Tvůj Index BMI</div>
+                                    <div className="text-3xl font-black italic">{bmi}</div>
+                                </div>
+                                <div className="text-right">
+                                    <div className="text-[10px] font-black uppercase text-white/30 mb-1">Kategorie</div>
+                                    <div className={`font-black uppercase text-sm ${bmiCategory(bmi).color}`}>{bmiCategory(bmi).label}</div>
+                                </div>
+                            </div>
+
+                            {/* Integration Section */}
+                            <div className="space-y-3">
+                                <div className="text-[10px] font-black uppercase text-white/30 tracking-widest px-1">Propojení</div>
+                                <div className="w-full p-4 rounded-2xl bg-white/5 border border-white/5 flex items-center justify-between">
+                                    <div className="flex items-center gap-3">
+                                        <Icon name="heart" size={18} className="text-red-500" />
+                                        <span className="text-sm font-bold">Apple Health</span>
+                                    </div>
+                                    <div className="w-10 h-5 bg-white/10 rounded-full relative">
+                                        <div className="absolute right-1 top-1 w-3 h-3 bg-white/20 rounded-full"></div>
+                                    </div>
+                                </div>
+                                <p className="text-[9px] text-white/20 italic px-2">
+                                    Pozn: Přímá synchronizace s HealthKit vyžaduje nativní aplikaci.
+                                </p>
+                            </div>
+                        </div>
+
+                        <div className="mt-auto pt-8">
+                             <button 
+                                onClick={() => { if(confirm('Smazat data?')) { localStorage.clear(); window.location.reload(); } }}
+                                className="w-full p-4 rounded-2xl bg-red-600/10 border border-red-500/20 text-red-500 text-xs font-black uppercase tracking-widest"
+                            >
+                                Resetovat vše
                             </button>
+                        </div>
+                    </aside>
+
+                    {/* Header */}
+                    <header className="p-6 sticky top-0 bg-black/40 backdrop-blur-2xl z-50 border-b border-white/5 flex justify-between items-center">
+                        <div className="flex items-center gap-3">
+                            <button onClick={() => setIsMenuOpen(true)} className="p-2 -ml-2 text-white/60 hover:text-white transition-colors">
+                                <Icon name="menu" size={24} />
+                            </button>
+                            <span className="font-black italic tracking-tighter text-xl uppercase leading-none">FRANCIS <span className="gradient-text">LIFTS</span></span>
+                        </div>
+                        <div className="flex items-center gap-3">
+                            {timer !== null && (
+                                <div className="bg-red-600 px-3 py-1.5 rounded-full text-[10px] font-black timer-active flex items-center gap-2 shadow-lg shadow-red-600/20">
+                                    <Icon name="clock" size={10} />
+                                    {Math.floor(timer / 60)}:{(timer % 60).toString().padStart(2, '0')}
+                                </div>
+                            )}
                         </div>
                     </header>
 
-                    <main className="flex-1 p-4 pb-32 overflow-y-auto scrollbar-hide">
+                    <main className="p-4 space-y-6">
                         {activeTab === 'diary' && (
-                            <div className="space-y-6 card-enter">
-                                {/* Kalendář / Plán */}
-                                <section className="bg-[#12161D] p-5 rounded-3xl border border-white/5">
-                                    <h2 className="text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-4 px-1">Týdenní Tréninkový Split</h2>
-                                    <div className="grid grid-cols-7 gap-2">
-                                        {[1, 2, 3, 4, 5, 6, 0].map(day => {
-                                            const info = TRAINING_PLAN[day];
-                                            const isToday = day === today;
+                            <div className="space-y-6 animate-in slide-in-from-right duration-300">
+                                
+                                {/* Calendar Section */}
+                                <section className="glass p-5 rounded-[32px] space-y-4">
+                                    <div className="flex justify-between items-end">
+                                        <div>
+                                            <div className="text-[10px] font-black uppercase tracking-widest text-white/30 mb-1">Historie Tréninků</div>
+                                            <div className="text-lg font-black text-white">{selectedDate.toLocaleDateString('cs-CZ', { day: 'numeric', month: 'long' })}</div>
+                                        </div>
+                                        <div className="relative">
+                                            <input 
+                                                type="date" 
+                                                className="opacity-0 absolute inset-0 w-full cursor-pointer z-10"
+                                                onChange={(e) => {
+                                                    if (e.target.value) {
+                                                        const parts = e.target.value.split('-');
+                                                        setSelectedDate(new Date(parts[0], parts[1] - 1, parts[2]));
+                                                    }
+                                                }}
+                                            />
+                                            <div className="bg-red-600/10 p-3 rounded-2xl border border-red-500/20 text-red-500 hover:bg-red-600/20 transition-all">
+                                                <Icon name="calendar" size={18} />
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <div className="flex justify-between gap-1">
+                                        {weekDays.map((d, i) => {
+                                            const isSelected = d.toDateString() === selectedDate.toDateString();
+                                            const isToday = d.toDateString() === new Date().toDateString();
                                             return (
-                                                <div key={day} className={`flex flex-col items-center p-2 rounded-xl border transition-all ${isToday ? 'bg-red-600 border-red-500 glow-red' : 'bg-black/20 border-white/5 opacity-60'}`}>
-                                                    <span className="text-[10px] font-bold mb-1">{info.name.substring(0, 2)}</span>
-                                                    <Icon name={info.icon} size={14} className={isToday ? "text-white" : "text-slate-400"} />
+                                                <div 
+                                                    key={i} 
+                                                    onClick={() => setSelectedDate(d)}
+                                                    className={`day-node flex-1 ${isSelected ? 'day-active' : 'bg-white/5 text-white/30'} ${isToday && !isSelected ? 'border border-red-600/50' : ''}`}
+                                                >
+                                                    <span className="text-[9px] font-bold mb-1 opacity-60">{TRAINING_SPLIT[d.getDay()].name.substring(0, 2)}</span>
+                                                    <span className="text-sm font-black">{d.getDate()}</span>
                                                 </div>
                                             );
                                         })}
                                     </div>
-                                    <div className="mt-4 p-3 bg-black/30 rounded-2xl flex items-center gap-3 border border-white/5">
-                                        <div className="p-2 bg-red-600/20 rounded-lg">
-                                            <Icon name="calendar" size={16} className="text-red-500" />
-                                        </div>
+                                    
+                                    <div className="bg-black/40 p-4 rounded-2xl border border-white/5 flex items-center justify-between">
                                         <div>
-                                            <div className="text-[10px] font-bold text-slate-500 uppercase">Dnešní fokus</div>
-                                            <div className="text-sm font-bold text-white">{todayPlan.focus}</div>
+                                            <div className="text-[9px] font-black text-white/20 uppercase mb-1">Dnešní Plán</div>
+                                            <div className="text-sm font-black italic">{TRAINING_SPLIT[selectedDate.getDay()].focus}</div>
+                                        </div>
+                                        <div className="text-right">
+                                            <div className="text-[9px] font-black text-white/20 uppercase mb-1">Série</div>
+                                            <div className="text-sm font-black text-red-500">{filteredSets.length}</div>
                                         </div>
                                     </div>
                                 </section>
 
-                                <div className="grid grid-cols-2 gap-3">
-                                    <div className="bg-[#12161D] p-4 rounded-2xl border border-white/5">
-                                        <div className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Celkový Objem</div>
-                                        <div className="text-xl font-black">{totalVolume.toLocaleString()} <span className="text-xs text-red-500">KG</span></div>
-                                    </div>
-                                    <div className="bg-[#12161D] p-4 rounded-2xl border border-white/5">
-                                        <div className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Série dnes</div>
-                                        <div className="text-xl font-black">{sets.length} <span className="text-xs text-red-500">SETS</span></div>
-                                    </div>
-                                </div>
-
-                                <div className="bg-[#12161D] p-6 rounded-3xl border border-red-600/20">
-                                    <h2 className="text-xs font-black uppercase text-red-500 mb-4 tracking-widest flex items-center gap-2">
-                                        <Icon name="plus-circle" size={14} /> Nová Série
-                                    </h2>
-                                    <div className="space-y-3">
-                                        <input 
-                                            placeholder="Cvik (např. Benchpress)" 
-                                            value={newSet.exercise}
-                                            onChange={e => setNewSet({...newSet, exercise: e.target.value})}
-                                            className="w-full bg-black/40 border border-white/10 p-4 rounded-xl font-medium text-white placeholder:text-slate-600"
-                                        />
-                                        <div className="flex gap-3">
-                                            <input 
-                                                type="number" placeholder="Váha kg" 
-                                                value={newSet.weight}
-                                                onChange={e => setNewSet({...newSet, weight: e.target.value})}
-                                                className="w-1/2 bg-black/40 border border-white/10 p-4 rounded-xl font-medium text-center text-white placeholder:text-slate-600"
-                                            />
-                                            <input 
-                                                type="number" placeholder="Opakování" 
-                                                value={newSet.reps}
-                                                onChange={e => setNewSet({...newSet, reps: e.target.value})}
-                                                className="w-1/2 bg-black/40 border border-white/10 p-4 rounded-xl font-medium text-center text-white placeholder:text-slate-600"
-                                            />
-                                        </div>
+                                {/* Rest Timer */}
+                                <div className="flex gap-2 justify-center overflow-x-auto pb-2 scrollbar-hide">
+                                    {[60, 90, 180, 300].map(s => (
                                         <button 
-                                            onClick={addSet}
-                                            className="w-full bg-red-600 hover:bg-red-500 py-4 rounded-2xl font-black uppercase text-sm tracking-widest transition-all glow-red"
+                                            key={s}
+                                            onClick={() => setTimer(s)}
+                                            className={`px-4 py-3 rounded-2xl bg-white/5 border border-white/10 text-[10px] font-black uppercase whitespace-nowrap hover:bg-red-600 hover:text-white transition-all flex items-center gap-2 ${s === 300 ? 'border-red-500/50 text-red-500' : ''}`}
                                         >
-                                            Uložit Sérii
+                                            <Icon name="clock" size={14} />
+                                            {s >= 60 ? `${s/60}m` : `${s}s`}
                                         </button>
-                                    </div>
-                                </div>
-
-                                <div className="space-y-3">
-                                    <h3 className="text-[10px] font-bold text-slate-500 uppercase tracking-widest px-2">Poslední záznamy</h3>
-                                    {sets.map(s => (
-                                        <div key={s.id} className="bg-[#12161D]/50 p-4 rounded-2xl flex justify-between items-center border border-white/5 group">
-                                            <div>
-                                                <div className="font-bold text-sm text-white">{s.exercise}</div>
-                                                <div className="text-xs text-slate-500">{s.weight}kg × {s.reps} reps</div>
-                                            </div>
-                                            <button onClick={() => deleteSet(s.id)} className="p-2 text-slate-700 hover:text-red-500 transition-colors">
-                                                <Icon name="trash" size={16} />
-                                            </button>
-                                        </div>
                                     ))}
-                                    {sets.length === 0 && <div className="text-center py-10 text-slate-600 text-sm italic">Zatím žádné záznamy. Makej! 🏋️‍♂️</div>}
-                                </div>
-                            </div>
-                        )}
-
-                        {activeTab === 'prs' && (
-                            <div className="space-y-6 card-enter">
-                                <div className="bg-gradient-to-br from-red-600/20 to-orange-600/10 p-8 rounded-3xl border border-red-600/30 text-center">
-                                    <div className="text-[10px] font-bold text-red-500 uppercase tracking-widest mb-1">Tvá aktuální váha</div>
-                                    <div className="flex justify-center items-center gap-6">
-                                        <button onClick={() => setUserWeight(prev => prev - 0.5)} className="p-3 bg-black/40 rounded-full hover:bg-black/60"><Icon name="minus" size={18}/></button>
-                                        <span className="text-4xl font-black tracking-tight">{userWeight}<span className="text-lg ml-1 text-slate-500">kg</span></span>
-                                        <button onClick={() => setUserWeight(prev => prev + 0.5)} className="p-3 bg-black/40 rounded-full hover:bg-black/60"><Icon name="plus" size={18}/></button>
-                                    </div>
                                 </div>
 
-                                <div className="space-y-3">
-                                    <h3 className="text-[10px] font-bold text-slate-500 uppercase tracking-widest px-2">Osobní Rekordy</h3>
-                                    {prs.map((pr, i) => {
-                                        const rank = getRank(pr.exercise, parseFloat(pr.weight));
-                                        return (
-                                            <div key={i} className="bg-[#12161D] p-5 rounded-2xl border border-white/5 flex justify-between items-center transition-transform hover:scale-[1.02]">
-                                                <div>
-                                                    <div className="text-[10px] font-bold text-slate-500 uppercase">{pr.exercise}</div>
-                                                    <div className="text-2xl font-black">{pr.weight}kg</div>
-                                                    <div className={`text-[10px] font-black uppercase ${rank.color}`}>{rank.label}</div>
-                                                </div>
-                                                <div className="p-4 bg-black/30 rounded-2xl">
-                                                    <Icon name="award" size={28} className="text-red-500" />
-                                                </div>
-                                            </div>
-                                        );
-                                    })}
-                                    {prs.length === 0 && <div className="text-center py-10 text-slate-600 text-sm italic">Zapiš trénink, aby se ukázaly tvoje rekordy.</div>}
-                                </div>
-                            </div>
-                        )}
-
-                        {activeTab === 'calc' && (
-                            <div className="space-y-6 card-enter">
-                                <div className="bg-[#12161D] p-6 rounded-3xl border border-white/5">
-                                    <h2 className="text-xs font-black uppercase text-red-500 mb-6 tracking-widest">Kalkulačka Maximálky (1RM)</h2>
-                                    <div className="space-y-6">
-                                        <div className="flex gap-4">
-                                            <div className="flex-1 space-y-2">
-                                                <label className="text-[10px] font-bold text-slate-500 uppercase px-1">Váha (kg)</label>
-                                                <input 
-                                                    type="number" 
-                                                    value={calcInput.weight}
-                                                    onChange={e => setCalcInput({...calcInput, weight: e.target.value})}
-                                                    className="w-full bg-black/40 border border-white/10 p-4 rounded-xl text-center font-bold text-white"
-                                                />
-                                            </div>
-                                            <div className="flex-1 space-y-2">
-                                                <label className="text-[10px] font-bold text-slate-500 uppercase px-1">Opakování</label>
-                                                <input 
-                                                    type="number" 
-                                                    value={calcInput.reps}
-                                                    onChange={e => setCalcInput({...calcInput, reps: e.target.value})}
-                                                    className="w-full bg-black/40 border border-white/10 p-4 rounded-xl text-center font-bold text-white"
-                                                />
-                                            </div>
-                                        </div>
-
-                                        {calculate1RM(calcInput.weight, calcInput.reps) && (
-                                            <div className="mt-8 p-8 bg-red-600 rounded-3xl text-center glow-red animate-pulse">
-                                                <div className="text-xs font-bold uppercase opacity-80 mb-1">Tvůj odhadovaný strop</div>
-                                                <div className="text-5xl font-black">{calculate1RM(calcInput.weight, calcInput.reps)}<span className="text-xl ml-1">kg</span></div>
-                                            </div>
-                                        )}
-                                    </div>
-                                </div>
-                                <div className="bg-[#12161D]/50 p-6 rounded-2xl text-xs text-slate-500 leading-relaxed border border-white/5">
-                                    💡 <strong>Tip pro liftery:</strong> Výpočet maximálky je nejpřesnější v rozmezí 2 až 8 opakování. U vyšších počtů už hraje velkou roli vytrvalost.
-                                </div>
-                            </div>
-                        )}
-
-                        {activeTab === 'chat' && (
-                            <div className="flex flex-col h-[70vh] card-enter">
-                                <div className="flex-1 overflow-y-auto space-y-4 scrollbar-hide pr-2 mb-4">
-                                    {chatMessages.map((m, i) => (
-                                        <div key={i} className={`flex ${m.role === 'user' ? 'justify-end' : 'justify-start'}`}>
-                                            <div className={`max-w-[85%] p-4 rounded-2xl text-sm leading-relaxed shadow-lg ${
-                                                m.role === 'user' 
-                                                ? 'bg-red-600 font-medium text-white rounded-br-none' 
-                                                : 'bg-[#12161D] border border-white/10 text-slate-200 rounded-bl-none'
-                                            }`}>
-                                                {m.text}
-                                            </div>
-                                        </div>
-                                    ))}
-                                    {isThinking && (
-                                        <div className="flex justify-start">
-                                            <div className="bg-[#12161D] p-4 rounded-2xl text-xs text-slate-500 italic animate-pulse">
-                                                Francis Coach píše...
-                                            </div>
-                                        </div>
-                                    )}
-                                    <div ref={chatEndRef} />
-                                </div>
-                                
-                                <div className="flex gap-2 bg-[#12161D] p-2 rounded-2xl border border-white/10">
+                                {/* Input Area */}
+                                <div className="glass p-6 rounded-[32px] border-t border-red-600/30 space-y-4">
                                     <input 
-                                        placeholder="Zeptej se kouče..."
-                                        value={userInput}
-                                        onChange={e => setUserInput(e.target.value)}
-                                        onKeyPress={e => e.key === 'Enter' && handleChat()}
-                                        className="flex-1 bg-transparent border-none p-3 text-sm focus:ring-0 text-white"
+                                        placeholder="Název cviku"
+                                        className="w-full p-4 rounded-2xl text-sm font-bold"
+                                        value={newSet.exercise}
+                                        onChange={e => setNewSet({...newSet, exercise: e.target.value})}
                                     />
-                                    <button onClick={handleChat} className="bg-red-600 p-3 rounded-xl transition-transform active:scale-90">
-                                        <Icon name="send" size={20} />
+                                    <div className="flex gap-3">
+                                        <input 
+                                            type="number" placeholder="kg"
+                                            className="w-1/2 p-4 rounded-2xl text-center font-black text-lg"
+                                            value={newSet.weight}
+                                            onChange={e => setNewSet({...newSet, weight: e.target.value})}
+                                        />
+                                        <input 
+                                            type="number" placeholder="reps"
+                                            className="w-1/2 p-4 rounded-2xl text-center font-black text-lg"
+                                            value={newSet.reps}
+                                            onChange={e => setNewSet({...newSet, reps: e.target.value})}
+                                        />
+                                    </div>
+                                    <button 
+                                        onClick={addSet}
+                                        className="w-full bg-red-600 py-4 rounded-2xl font-black uppercase text-sm tracking-widest glow-red active:scale-95 transition-all"
+                                    >
+                                        Uložit Sérii
                                     </button>
+                                </div>
+
+                                {/* List of Sets */}
+                                <div className="space-y-3">
+                                    {filteredSets.length === 0 ? (
+                                        <div className="text-center py-12 text-white/10 font-black italic uppercase tracking-widest">Žádný záznam pro tento den</div>
+                                    ) : (
+                                        filteredSets.map(s => (
+                                            <div key={s.id} className="glass p-4 rounded-2xl flex justify-between items-center animate-in slide-in-from-left duration-300">
+                                                <div className="flex items-center gap-4">
+                                                    <div className="w-10 h-10 bg-white/5 rounded-xl flex items-center justify-center font-black text-xs text-red-500">
+                                                        {s.weight}
+                                                    </div>
+                                                    <div>
+                                                        <div className="font-black text-sm uppercase">{s.exercise}</div>
+                                                        <div className="text-[10px] text-white/40 uppercase font-bold">{s.reps} opakování</div>
+                                                    </div>
+                                                </div>
+                                                <button onClick={() => { if(confirm('Smazat?')) setSets(sets.filter(item => item.id !== s.id)) }} className="p-2 text-white/20 hover:text-red-500 transition-all">
+                                                    <Icon name="trash" size={14} />
+                                                </button>
+                                            </div>
+                                        ))
+                                    )}
+                                </div>
+                            </div>
+                        )}
+                        
+                        {activeTab === 'prs' && (
+                            <div className="space-y-4 animate-in fade-in duration-500">
+                                <h3 className="text-xl font-black italic uppercase px-2">Tvoje <span className="text-red-500">Rekordy</span></h3>
+                                <div className="grid gap-3">
+                                    {Array.from(new Set(sets.map(s => s.exercise))).length === 0 ? (
+                                        <div className="text-center py-12 text-white/10 font-black uppercase">Zatím žádné rekordy</div>
+                                    ) : (
+                                        Array.from(new Set(sets.map(s => s.exercise))).map((ex, i) => {
+                                            const exerciseSets = sets.filter(s => s.exercise.toLowerCase() === ex.toLowerCase());
+                                            const best = exerciseSets.reduce((max, s) => parseFloat(s.weight) > parseFloat(max.weight) ? s : max, { weight: 0 });
+                                            return (
+                                                <div key={i} className="glass p-5 rounded-3xl flex justify-between items-center">
+                                                    <div>
+                                                        <div className="text-[10px] font-black text-white/30 uppercase mb-1">{ex}</div>
+                                                        <div className="text-2xl font-black">{best.weight} kg</div>
+                                                    </div>
+                                                    <div className="w-12 h-12 bg-red-600/10 rounded-2xl flex items-center justify-center text-red-500">
+                                                        <Icon name="award" size={24} />
+                                                    </div>
+                                                </div>
+                                            );
+                                        })
+                                    )}
+                                </div>
+                            </div>
+                        )}
+
+                        {}
+                        {activeTab === 'calc' && (
+                            <div className="space-y-6 animate-in slide-in-from-bottom duration-500">
+                                <div className="px-2">
+                                    <h3 className="text-xl font-black italic uppercase">Kalkulačka <span className="text-red-500">1RM</span></h3>
+                                    <p className="text-[10px] text-white/30 uppercase font-black tracking-widest mt-1">Odhad tvého maxima na jedno opakování</p>
+                                </div>
+
+                                <div className="glass p-8 rounded-[40px] border-t border-red-500/20 text-center space-y-8">
+                                    <div className="relative inline-block">
+                                        <div className="absolute -inset-4 bg-red-600/20 blur-2xl rounded-full"></div>
+                                        <div className="relative">
+                                            <div className="text-[10px] font-black text-red-500 uppercase tracking-[0.2em] mb-2">Předpokládané Maximum</div>
+                                            <div className="text-7xl font-black italic text-white flex items-baseline justify-center gap-2">
+                                                {oneRepMax}
+                                                <span className="text-xl text-white/20 not-italic">kg</span>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <div className="grid grid-cols-2 gap-4">
+                                        <div className="space-y-2">
+                                            <label className="text-[10px] font-black uppercase text-white/30 tracking-widest block">Váha (kg)</label>
+                                            <input 
+                                                type="number" 
+                                                placeholder="0"
+                                                value={calcWeight}
+                                                onChange={e => setCalcWeight(e.target.value)}
+                                                className="w-full bg-white/5 border border-white/10 p-5 rounded-3xl text-2xl font-black text-center focus:border-red-500 transition-all"
+                                            />
+                                        </div>
+                                        <div className="space-y-2">
+                                            <label className="text-[10px] font-black uppercase text-white/30 tracking-widest block">Opakování</label>
+                                            <input 
+                                                type="number" 
+                                                placeholder="0"
+                                                value={calcReps}
+                                                onChange={e => setCalcReps(e.target.value)}
+                                                className="w-full bg-white/5 border border-white/10 p-5 rounded-3xl text-2xl font-black text-center focus:border-red-500 transition-all"
+                                            />
+                                        </div>
+                                    </div>
+
+                                    <div className="bg-black/40 p-5 rounded-3xl border border-white/5">
+                                        <p className="text-[11px] text-white/40 italic leading-relaxed">
+                                            Vypočteno pomocí <span className="text-white/60 font-bold">Epleyho formule</span>. 
+                                            Tento výpočet je nejpřesnější pro rozsah 2-10 opakování.
+                                        </p>
+                                    </div>
                                 </div>
                             </div>
                         )}
                     </main>
 
-                    <nav className="fixed bottom-0 left-0 right-0 bg-black/80 backdrop-blur-xl border-t border-white/10 pb-8 pt-3 z-50">
-                        <div className="flex justify-around max-w-2xl mx-auto px-4">
-                            {[
-                                { id: 'diary', icon: 'book-open', label: 'Deník' },
-                                { id: 'prs', icon: 'award', label: 'Rekordy' },
-                                { id: 'calc', icon: 'calculator', label: '1RM' },
-                                { id: 'chat', icon: 'message-square', label: 'Kouč' },
-                            ].map(t => (
-                                <button 
-                                    key={t.id}
-                                    onClick={() => setActiveTab(t.id)}
-                                    className={`flex flex-col items-center gap-1.5 px-4 py-2 rounded-2xl tab-transition ${
-                                        activeTab === t.id ? 'bg-red-600/10 text-red-500 scale-105' : 'text-slate-500 opacity-60'
-                                    }`}
-                                >
-                                    <Icon name={t.icon} size={22} className={activeTab === t.id ? "stroke-[2.5px]" : "stroke-[2px]"} />
-                                    <span className="text-[10px] font-black uppercase tracking-tighter">{t.label}</span>
-                                </button>
-                            ))}
-                        </div>
+                    {/* Bottom Navbar */}
+                    <nav className="fixed bottom-6 left-4 right-4 max-w-md mx-auto glass rounded-[28px] p-3 flex justify-around items-center z-[100] shadow-2xl">
+                        {[
+                            { id: 'diary', icon: 'calendar', label: 'Deník' },
+                            { id: 'prs', icon: 'trophy', label: 'Best' },
+                            { id: 'calc', icon: 'zap', label: '1RM' }
+                        ].map(t => (
+                            <button 
+                                key={t.id}
+                                onClick={() => setActiveTab(t.id)}
+                                className={`flex flex-col items-center gap-1.5 px-4 py-2 rounded-2xl transition-all duration-300 ${activeTab === t.id ? 'text-red-500 scale-110 bg-red-600/5' : 'text-white/20'}`}
+                            >
+                                <Icon name={t.icon} size={20} className={activeTab === t.id ? 'stroke-[2.5px]' : 'stroke-[2px]'} />
+                                <span className="text-[9px] font-black uppercase tracking-tighter">{t.label}</span>
+                            </button>
+                        ))}
                     </nav>
                 </div>
             );
