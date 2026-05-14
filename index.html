@@ -1,87 +1,106 @@
 <!DOCTYPE html>
-<html lang="cs">
+<html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Francis Lifts</title>
     <script src="https://cdn.tailwindcss.com"></script>
-    <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
-    <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+    <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+    <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
     <script src="https://unpkg.com/lucide@latest"></script>
     <style>
-        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;700;900&display=swap');
-        body { font-family: 'Inter', sans-serif; background-color: #07090C; margin: 0; }
-        input, select { font-size: 16px !important; }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { 
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', sans-serif;
+            background-color: #07090C;
+            color: white;
+            overflow-x: hidden;
+        }
     </style>
 </head>
 <body>
-    <div id="root"></div>
+    <div id="app"></div>
+    
     <script type="text/babel">
         const { useState, useEffect } = React;
-        const LucideIcon = ({ name, size = 20, className = "" }) => <i data-lucide={name} className={className} style={{ width: size, height: size }}></i>;
-        const STRENGTH_STANDARDS = {
-            benchpress: { intermediate: 1.1, advanced: 1.45, elite: 1.8 },
-            deadlift: { intermediate: 1.85, advanced: 2.35, elite: 2.9 },
-            squat: { intermediate: 1.5, advanced: 2.0, elite: 2.5 }
-        };
+
         function App() {
             const [activeTab, setActiveTab] = useState('diary');
             const [profile] = useState({ weight: 85 });
             const [records] = useState([
-                { id: 1, exercise: 'Bench Press', weight: 100 },
-                { id: 2, exercise: 'Deadlift', weight: 180 },
-                { id: 3, exercise: 'Squat', weight: 140 }
+                { exercise: 'Bench Press', weight: 100 },
+                { exercise: 'Deadlift', weight: 180 },
+                { exercise: 'Squat', weight: 140 }
             ]);
-            useEffect(() => { setTimeout(() => lucide.createIcons(), 500); }, []);
-            useEffect(() => { lucide.createIcons(); }, [activeTab]);
+
+            useEffect(() => {
+                setTimeout(() => {
+                    if (window.lucide) lucide.createIcons();
+                }, 100);
+            }, [activeTab]);
+
             const getRank = (ex, w) => {
                 const ratio = w / profile.weight;
-                const key = ex.toLowerCase().replace(" ", "");
-                const std = STRENGTH_STANDARDS[key] || STRENGTH_STANDARDS.benchpress;
-                if (ratio >= std.elite) return { label: 'ELITE', color: 'text-red-500', pct: 95 };
-                if (ratio >= std.advanced) return { label: 'ADVANCED', color: 'text-orange-500', pct: 80 };
-                return { label: 'INTERMEDIATE', color: 'text-yellow-500', pct: 50 };
+                const standards = {
+                    'benchpress': { intermediate: 1.1, advanced: 1.45, elite: 1.8 },
+                    'deadlift': { intermediate: 1.85, advanced: 2.35, elite: 2.9 },
+                    'squat': { intermediate: 1.5, advanced: 2.0, elite: 2.5 }
+                };
+                const key = ex.toLowerCase().replace(/\s/g, '');
+                const std = standards[key] || standards.benchpress;
+                
+                if (ratio >= std.elite) return { label: 'ELITE', color: '#ef4444', pct: 95 };
+                if (ratio >= std.advanced) return { label: 'ADVANCED', color: '#f97316', pct: 80 };
+                return { label: 'INTERMEDIATE', color: '#eab308', pct: 50 };
             };
+
             return (
-                <div className="min-h-screen pb-32 flex flex-col items-center">
-                    <header className="w-full max-w-md p-6 flex justify-between items-center sticky top-0 bg-[#07090C]/80 z-50">
-                        <div className="flex items-center gap-2">
-                            <div className="bg-red-600 p-2 rounded-lg"><LucideIcon name="zap" size={20} className="text-white" /></div>
-                            <h1 className="text-xl font-black text-white">FRANCIS <span className="text-red-600">LIFTS</span></h1>
+                <div style={{ minHeight: '100vh', paddingBottom: '120px', display: 'flex', flexDirection: 'column', alignItems: 'center', backgroundColor: '#07090C' }}>
+                    {/* Header */}
+                    <header style={{ width: '100%', maxWidth: '500px', padding: '24px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', position: 'sticky', top: 0, backgroundColor: 'rgba(7, 9, 12, 0.8)', zIndex: 50, backdropFilter: 'blur(12px)' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                            <div style={{ backgroundColor: '#dc2626', padding: '8px', borderRadius: '8px' }}>
+                                <svg style={{ width: 20, height: 20, color: 'white' }} data-lucide="zap" stroke="currentColor" strokeWidth="2" fill="none" strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon></svg>
+                            </div>
+                            <h1 style={{ fontSize: '20px', fontWeight: 900, color: 'white' }}>FRANCIS <span style={{ color: '#dc2626' }}>LIFTS</span></h1>
                         </div>
-                        <LucideIcon name="user" className="text-slate-500" />
+                        <svg style={{ width: 20, height: 20, color: '#64748b' }} data-lucide="user" stroke="currentColor" strokeWidth="2" fill="none" strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle></svg>
                     </header>
-                    <main className="w-full max-w-md px-4 space-y-6">
+
+                    {/* Main Content */}
+                    <main style={{ width: '100%', maxWidth: '500px', padding: '0 16px', marginTop: '24px' }}>
                         {activeTab === 'diary' && (
-                            <div className="bg-[#12161D] p-6 rounded-3xl border border-white/5">
-                                <h2 className="text-red-500 mb-4 font-black">Log Workout</h2>
-                                <input placeholder="Exercise" className="w-full bg-[#0B0F15] border border-white/5 p-4 rounded-2xl text-white mb-4" />
-                                <div className="grid grid-cols-2 gap-4">
-                                    <input type="number" placeholder="Weight (kg)" className="bg-[#0B0F15] border border-white/5 p-4 rounded-2xl text-white" />
-                                    <input type="number" placeholder="Reps" className="bg-[#0B0F15] border border-white/5 p-4 rounded-2xl text-white" />
+                            <div style={{ backgroundColor: '#12161D', padding: '24px', borderRadius: '24px', border: '1px solid rgba(255,255,255,0.05)' }}>
+                                <h2 style={{ fontSize: '12px', fontWeight: 900, color: '#dc2626', marginBottom: '16px' }}>LOG WORKOUT</h2>
+                                <input placeholder="Exercise" style={{ width: '100%', backgroundColor: '#0B0F15', border: '1px solid rgba(255,255,255,0.05)', padding: '16px', borderRadius: '16px', color: 'white', marginBottom: '16px', fontSize: '16px' }} />
+                                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', marginBottom: '16px' }}>
+                                    <input type="number" placeholder="Weight (kg)" style={{ backgroundColor: '#0B0F15', border: '1px solid rgba(255,255,255,0.05)', padding: '16px', borderRadius: '16px', color: 'white', fontSize: '16px', textAlign: 'center' }} />
+                                    <input type="number" placeholder="Reps" style={{ backgroundColor: '#0B0F15', border: '1px solid rgba(255,255,255,0.05)', padding: '16px', borderRadius: '16px', color: 'white', fontSize: '16px', textAlign: 'center' }} />
                                 </div>
-                                <button className="w-full bg-red-600 p-4 rounded-2xl text-white font-black mt-4">Save</button>
+                                <button style={{ width: '100%', backgroundColor: '#dc2626', padding: '16px', borderRadius: '16px', color: 'white', fontWeight: 900, border: 'none', cursor: 'pointer', fontSize: '14px' }}>SAVE</button>
                             </div>
                         )}
+
                         {activeTab === 'prs' && (
-                            <div className="space-y-4">
-                                <div className="bg-gradient-to-br from-red-600 to-red-900 p-6 rounded-3xl">
-                                    <span className="text-white/60">Francis Score</span>
-                                    <div className="text-4xl font-black text-white">842</div>
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                                <div style={{ background: 'linear-gradient(to bottom right, #dc2626, #7f1d1d)', padding: '24px', borderRadius: '24px', border: '1px solid rgba(255,255,255,0.1)' }}>
+                                    <span style={{ fontSize: '12px', fontWeight: 900, color: 'rgba(255,255,255,0.6)' }}>FRANCIS SCORE</span>
+                                    <div style={{ fontSize: '36px', fontWeight: 900, color: 'white', marginTop: '8px' }}>842</div>
+                                    <p style={{ fontSize: '12px', color: 'rgba(255,255,255,0.5)', marginTop: '8px' }}>You're stronger than 78% of people</p>
                                 </div>
-                                {records.map(r => {
+                                {records.map((r, idx) => {
                                     const rank = getRank(r.exercise, r.weight);
                                     return (
-                                        <div key={r.id} className="bg-[#12161D] p-5 rounded-3xl border border-white/5 flex justify-between">
+                                        <div key={idx} style={{ backgroundColor: '#12161D', padding: '20px', borderRadius: '24px', border: '1px solid rgba(255,255,255,0.05)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                                             <div>
-                                                <h3 className="text-slate-500 font-black">{r.exercise}</h3>
-                                                <div className="text-2xl text-white font-black">{r.weight}kg</div>
-                                                <span className={`text-sm ${rank.color}`}>{rank.label}</span>
+                                                <h3 style={{ fontSize: '12px', fontWeight: 900, color: '#64748b', marginBottom: '4px' }}>{r.exercise.toUpperCase()}</h3>
+                                                <div style={{ fontSize: '24px', fontWeight: 900, color: 'white' }}>{r.weight}kg</div>
+                                                <span style={{ fontSize: '12px', fontWeight: 900, color: rank.color }}>{rank.label}</span>
                                             </div>
-                                            <div className="text-right">
-                                                <div className="text-slate-500">Percentile</div>
-                                                <div className="text-xl font-black text-white">{rank.pct}%</div>
+                                            <div style={{ textAlign: 'right' }}>
+                                                <div style={{ fontSize: '12px', color: '#64748b', fontWeight: 'bold', marginBottom: '4px' }}>PERCENTILE</div>
+                                                <div style={{ fontSize: '20px', fontWeight: 900, color: 'white' }}>{rank.pct}%</div>
                                             </div>
                                         </div>
                                     );
@@ -89,23 +108,44 @@
                             </div>
                         )}
                     </main>
-                    <nav className="fixed bottom-6 w-[90%] max-w-md bg-[#12161D]/90 p-2 rounded-3xl flex justify-between z-50">
+
+                    {/* Navigation */}
+                    <nav style={{ position: 'fixed', bottom: '24px', width: '90%', maxWidth: '500px', backgroundColor: 'rgba(18, 22, 29, 0.9)', backdropFilter: 'blur(12px)', border: '1px solid rgba(255,255,255,0.1)', padding: '8px', borderRadius: '24px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', zIndex: 50 }}>
                         {[
                             { id: 'diary', icon: 'history', label: 'Diary' },
                             { id: 'prs', icon: 'award', label: 'PRs' },
                             { id: 'ai', icon: 'message-square', label: 'Coach' },
                             { id: 'calc', icon: 'calculator', label: 'Calc' }
                         ].map(t => (
-                            <button key={t.id} onClick={() => setActiveTab(t.id)} className={`flex-1 flex flex-col items-center py-3 rounded-2xl ${activeTab === t.id ? 'bg-red-600 text-white' : 'text-slate-500'}`}>
-                                <LucideIcon name={t.icon} size={18} />
-                                <span className="text-[8px] font-black">{t.label}</span>
+                            <button
+                                key={t.id}
+                                onClick={() => setActiveTab(t.id)}
+                                style={{
+                                    flex: 1,
+                                    display: 'flex',
+                                    flexDirection: 'column',
+                                    alignItems: 'center',
+                                    gap: '4px',
+                                    padding: '12px',
+                                    borderRadius: '16px',
+                                    backgroundColor: activeTab === t.id ? '#dc2626' : 'transparent',
+                                    color: activeTab === t.id ? 'white' : '#64748b',
+                                    border: 'none',
+                                    cursor: 'pointer',
+                                    transition: 'all 0.2s'
+                                }}
+                            >
+                                <svg style={{ width: 18, height: 18 }} data-lucide={t.icon} stroke="currentColor" strokeWidth="2" fill="none" strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24"></svg>
+                                <span style={{ fontSize: '8px', fontWeight: 900 }}>{t.label}</span>
                             </button>
                         ))}
                     </nav>
                 </div>
             );
         }
-        ReactDOM.createRoot(document.getElementById('root')).render(<App />);
+
+        const root = ReactDOM.createRoot(document.getElementById('app'));
+        root.render(<App />);
     </script>
 </body>
 </html>
