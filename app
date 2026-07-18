@@ -14,6 +14,7 @@
     <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-auth-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-firestore-compat.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/3.9.1/chart.min.js"></script>
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;700;900&display=swap');
         body { 
@@ -45,10 +46,18 @@
             border-radius: 8px;
             z-index: 1000;
             animation: slideUp 0.3s ease-in-out;
+            max-width: 80%;
         }
         @keyframes slideUp {
             from { transform: translateX(-50%) translateY(20px); opacity: 0; }
             to { transform: translateX(-50%) translateY(0); opacity: 1; }
+        }
+        .pulse-border {
+            animation: pulse-border 2s infinite;
+        }
+        @keyframes pulse-border {
+            0%, 100% { border-color: rgba(220, 38, 38, 0.5); }
+            50% { border-color: rgba(220, 38, 38, 1); }
         }
     </style>
 </head>
@@ -61,15 +70,13 @@
             return <i data-lucide={name} className={className} style={{ width: size, height: size }}></i>;
         };
 
-        // Firebase Config
         const firebaseConfig = {
             apiKey: "AIzaSyAtXYwDag14X5YS8GZHV_3zANJxZn6R1nQ",
             authDomain: "gyme-3b2c0.firebaseapp.com",
             projectId: "gyme-3b2c0",
             storageBucket: "gyme-3b2c0.firebasestorage.app",
             messagingSenderId: "599463828481",
-            appId: "1:599463828481:web:786524ce2d97a10a22f400",
-            measurementId: "G-9XG9WJ9L8S"
+            appId: "1:599463828481:web:786524ce2d97a10a22f400"
         };
 
         if (!firebase.apps.length) {
@@ -82,10 +89,17 @@
         const STRENGTH_STANDARDS = {
             benchpress: { intermediate: 1.1, advanced: 1.45, elite: 1.8 },
             deadlift: { intermediate: 1.85, advanced: 2.35, elite: 2.9 },
-            squat: { intermediate: 1.5, advanced: 2.0, elite: 2.5 }
+            squat: { intermediate: 1.5, advanced: 2.0, elite: 2.5 },
+            barbell: { intermediate: 1.1, advanced: 1.45, elite: 1.8 },
+            dumbbell: { intermediate: 0.6, advanced: 0.8, elite: 1.0 }
         };
 
-        // Validation utilities
+        const EXERCISE_SUGGESTIONS = [
+            'Bench Press', 'Squat', 'Deadlift', 'Barbell Row',
+            'Pull-ups', 'Dips', 'Leg Press', 'Lat Pulldown',
+            'Shoulder Press', 'Bicep Curls', 'Tricep Dips'
+        ];
+
         const validateExercise = (name) => name.trim().length > 0 && name.trim().length <= 50;
         const validateWeight = (w) => !isNaN(w) && w > 0 && w < 500;
         const validateReps = (r) => !isNaN(r) && r > 0 && r <= 100;
@@ -96,24 +110,73 @@
             return <div className={`toast ${type === 'error' ? 'bg-red-600' : 'bg-green-600'}`}>{message}</div>;
         }
 
+        function RestTimer({ onClose }) {
+            const [timeLeft, setTimeLeft] = useState(300);
+            const [isRunning, setIsRunning] = useState(true);
+
+            useEffect(() => {
+                if (!isRunning || timeLeft <= 0) return;
+                const timer = setInterval(() => setTimeLeft(t => t - 1), 1000);
+                return () => clearInterval(timer);
+            }, [isRunning, timeLeft]);
+
+            const percentage = ((300 - timeLeft) / 300) * 100;
+
+            return (
+                <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50">
+                    <div className="bg-[#12161D] rounded-3xl p-8 text-center border border-red-600 w-80">
+                        <div className="relative w-40 h-40 mx-auto mb-6">
+                            <svg className="w-full h-full transform -rotate-90">
+                                <circle cx="80" cy="80" r="70" fill="none" stroke="rgba(255,255,255,0.1)" strokeWidth="8"/>
+                                <circle cx="80" cy="80" r="70" fill="none" stroke="#dc2626" strokeWidth="8" 
+                                    strokeDasharray={`${(percentage / 100) * 440}`} strokeDashoffset="0"/>
+                            </svg>
+                            <div className="absolute inset-0 flex items-center justify-center">
+                                <div>
+                                    <div className="text-4xl font-black text-white">{Math.floor(timeLeft / 60)}:{(timeLeft % 60).toString().padStart(2, '0')}</div>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div className="flex gap-3">
+                            <button 
+                                onClick={() => setIsRunning(!isRunning)}
+                                className="flex-1 bg-red-600 py-3 rounded-xl font-black uppercase text-sm"
+                            >
+                                {isRunning ? 'Pause' : 'Resume'}
+                            </button>
+                            <button 
+                                onClick={onClose}
+                                className="flex-1 bg-white/10 py-3 rounded-xl font-black uppercase text-sm"
+                            >
+                                Done
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            );
+        }
+
         function App() {
             const [activeTab, setActiveTab] = useState('diary');
             const [user, setUser] = useState(null);
             const [loading, setLoading] = useState(true);
             const [syncing, setSyncing] = useState(false);
             const [toast, setToast] = useState(null);
+            const [showRestTimer, setShowRestTimer] = useState(false);
             
             const [profile, setProfile] = useState({ weight: 85, height: 180, age: 25 });
             const [workouts, setWorkouts] = useState([]);
             const [records, setRecords] = useState([]);
             
-            // Form states
             const [exerciseName, setExerciseName] = useState('');
             const [exerciseWeight, setExerciseWeight] = useState('');
             const [exerciseReps, setExerciseReps] = useState('');
             const [errors, setErrors] = useState({});
+            
+            const [oneRMWeight, setOneRMWeight] = useState('');
+            const [oneRMReps, setOneRMReps] = useState('');
 
-            // Initialize auth and sync data
             useEffect(() => {
                 auth.signInAnonymously()
                     .then(cred => {
@@ -187,7 +250,7 @@
                         workouts,
                         lastSync: new Date()
                     });
-                    showToast('Data synced', 'info');
+                    showToast('✓ Synced', 'info');
                 } catch (err) {
                     console.error('Sync error:', err);
                     showToast('Sync failed', 'error');
@@ -228,7 +291,8 @@
                 setExerciseReps('');
                 setErrors({});
                 
-                showToast('Workout added!', 'info');
+                showToast('💪 Workout added!', 'info');
+                setShowRestTimer(true);
                 
                 if (navigator.onLine) {
                     syncData();
@@ -262,6 +326,7 @@
                 updateRecords(updated);
                 localStorage.setItem('workouts', JSON.stringify(updated));
                 if (navigator.onLine) syncData();
+                showToast('Workout deleted', 'info');
             };
 
             const getRank = (ex, w) => {
@@ -278,6 +343,37 @@
                 return Math.round(records.reduce((sum, r) => sum + getRank(r.exercise, r.weight).pct, 0) / records.length);
             };
 
+            const calculateOneRM = () => {
+                const w = parseFloat(oneRMWeight);
+                const r = parseInt(oneRMReps);
+                if (!validateWeight(w) || !validateReps(r)) return 0;
+                if (r === 1) return w;
+                return Math.round(w * (1 + r / 30));
+            };
+
+            const getLastSevenDays = () => {
+                const last7 = [];
+                for (let i = 6; i >= 0; i--) {
+                    const d = new Date();
+                    d.setDate(d.getDate() - i);
+                    d.setHours(0, 0, 0, 0);
+                    last7.push(d);
+                }
+                return last7;
+            };
+
+            const getWorkoutCountByDay = () => {
+                const days = getLastSevenDays();
+                return days.map(day => {
+                    const count = workouts.filter(w => {
+                        const wDate = new Date(w.date);
+                        wDate.setHours(0, 0, 0, 0);
+                        return wDate.getTime() === day.getTime();
+                    }).length;
+                    return count;
+                });
+            };
+
             if (loading) {
                 return (
                     <div className="min-h-screen flex items-center justify-center bg-[#07090C]">
@@ -292,8 +388,9 @@
             return (
                 <div className="min-h-screen pb-32 flex flex-col items-center bg-[#07090C]">
                     {toast && <Toast {...toast} />}
+                    {showRestTimer && <RestTimer onClose={() => setShowRestTimer(false)} />}
                     
-                    <header className="w-full max-w-md p-6 flex justify-between items-center sticky top-0 bg-[#07090C]/80 backdrop-blur-md z-50">
+                    <header className="w-full max-w-md p-6 flex justify-between items-center sticky top-0 bg-[#07090C]/80 backdrop-blur-md z-50 border-b border-white/5">
                         <div className="flex items-center gap-2">
                             <div className="bg-red-600 p-2 rounded-lg">
                                 <LucideIcon name="zap" size={20} className="text-white" />
@@ -302,7 +399,6 @@
                         </div>
                         <div className="flex items-center gap-2">
                             {syncing && <LucideIcon name="loader" size={18} className="text-blue-500 animate-spin" />}
-                            <LucideIcon name="user" className="text-slate-500" />
                         </div>
                     </header>
 
@@ -310,9 +406,8 @@
                         
                         {activeTab === 'diary' && (
                             <div className="space-y-4 animate-in fade-in">
-                                {/* Profile Quick Stats */}
                                 <div className="bg-[#12161D] p-6 rounded-3xl border border-white/5">
-                                    <div className="grid grid-cols-3 gap-4">
+                                    <div className="grid grid-cols-3 gap-4 mb-6">
                                         <div className="text-center">
                                             <div className="text-[10px] text-slate-500 uppercase font-bold">Váha</div>
                                             <div className="text-2xl font-black text-white mt-1">{profile.weight}kg</div>
@@ -326,18 +421,44 @@
                                             <div className="text-2xl font-black text-white mt-1">{profile.age}</div>
                                         </div>
                                     </div>
+
+                                    <div className="bg-black/40 p-4 rounded-2xl border border-white/10">
+                                        <div className="text-[9px] text-slate-500 uppercase font-bold mb-2">Weekly Activity</div>
+                                        <div className="flex items-end justify-between gap-2 h-16">
+                                            {getWorkoutCountByDay().map((count, i) => (
+                                                <div key={i} className="flex flex-col items-center flex-1">
+                                                    <div className="w-full bg-red-600/30 rounded-t" style={{ height: `${Math.max(count * 30, 10)}px` }}></div>
+                                                    <div className="text-[8px] text-slate-500 mt-1">{'Mon Tue Wed Thu Fri Sat Sun'.split(' ')[i]}</div>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    </div>
                                 </div>
 
-                                {/* Add Workout */}
                                 <div className="bg-[#12161D] p-6 rounded-3xl border border-white/5">
                                     <h2 className="text-[10px] font-black uppercase tracking-widest text-red-500 mb-4">Přidat trénink</h2>
                                     <div className="space-y-4">
-                                        <input 
-                                            placeholder="Cvik (např. Bench Press)"
-                                            value={exerciseName}
-                                            onChange={e => setExerciseName(e.target.value)}
-                                            className={`w-full bg-[#0B0F15] border p-4 rounded-2xl text-white outline-none focus:border-red-500/50 transition ${errors.exercise ? 'border-red-500 error-shake' : 'border-white/5'}`}
-                                        />
+                                        <div className="relative">
+                                            <input 
+                                                placeholder="Cvik (např. Bench Press)"
+                                                value={exerciseName}
+                                                onChange={e => setExerciseName(e.target.value)}
+                                                className={`w-full bg-[#0B0F15] border p-4 rounded-2xl text-white outline-none focus:border-red-500/50 transition ${errors.exercise ? 'border-red-500 error-shake' : 'border-white/5'}`}
+                                            />
+                                            {exerciseName && (
+                                                <div className="absolute top-full left-0 right-0 bg-[#0B0F15] border border-white/10 rounded-2xl mt-1 max-h-32 overflow-y-auto z-20">
+                                                    {EXERCISE_SUGGESTIONS.filter(ex => ex.toLowerCase().includes(exerciseName.toLowerCase())).map((ex, i) => (
+                                                        <button
+                                                            key={i}
+                                                            onClick={() => setExerciseName(ex)}
+                                                            className="w-full text-left p-3 text-sm text-white hover:bg-white/5 border-b border-white/5 last:border-0"
+                                                        >
+                                                            {ex}
+                                                        </button>
+                                                    ))}
+                                                </div>
+                                            )}
+                                        </div>
                                         {errors.exercise && <p className="text-red-500 text-xs">{errors.exercise}</p>}
                                         
                                         <div className="grid grid-cols-2 gap-4">
@@ -372,7 +493,6 @@
                                     </div>
                                 </div>
 
-                                {/* Recent Workouts */}
                                 <div className="space-y-3">
                                     <h3 className="text-[10px] font-black uppercase tracking-widest text-white/40 px-2">Poslední tréninky</h3>
                                     {workouts.length === 0 ? (
@@ -432,6 +552,52 @@
                             </div>
                         )}
 
+                        {activeTab === 'calc' && (
+                            <div className="space-y-4 animate-in fade-in">
+                                <div className="bg-[#12161D] p-6 rounded-3xl border border-white/5">
+                                    <h2 className="text-[10px] font-black uppercase tracking-widest text-red-500 mb-6">Kalkulačka 1RM</h2>
+                                    
+                                    <div className="space-y-4 mb-6">
+                                        <div>
+                                            <label className="text-[10px] font-black uppercase text-white/40 mb-2 block">Váha (kg)</label>
+                                            <input 
+                                                type="number"
+                                                placeholder="150"
+                                                value={oneRMWeight}
+                                                onChange={e => setOneRMWeight(e.target.value)}
+                                                className="w-full bg-[#0B0F15] border border-white/5 p-4 rounded-2xl text-white text-center font-bold outline-none focus:border-red-500/50"
+                                            />
+                                        </div>
+
+                                        <div>
+                                            <label className="text-[10px] font-black uppercase text-white/40 mb-2 block">Opakování</label>
+                                            <input 
+                                                type="number"
+                                                placeholder="8"
+                                                value={oneRMReps}
+                                                onChange={e => setOneRMReps(e.target.value)}
+                                                className="w-full bg-[#0B0F15] border border-white/5 p-4 rounded-2xl text-white text-center font-bold outline-none focus:border-red-500/50"
+                                            />
+                                        </div>
+                                    </div>
+
+                                    {calculateOneRM() > 0 && (
+                                        <div className="bg-gradient-to-br from-red-600 to-red-900 p-6 rounded-2xl text-center">
+                                            <div className="text-[10px] text-white/70 uppercase font-bold mb-2">Odhadovaný 1RM</div>
+                                            <div className="text-4xl font-black text-white">{calculateOneRM()}kg</div>
+                                        </div>
+                                    )}
+
+                                    <div className="mt-6 pt-6 border-t border-white/10">
+                                        <div className="text-[9px] text-slate-500 space-y-2">
+                                            <p><strong>Brzettův vzorec:</strong> Weight × (1 + Reps/30)</p>
+                                            <p className="text-white/30">Používán pro odhad maximální síly z lehčích váh s vyšším počtem opakování.</p>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        )}
+
                         {activeTab === 'profile' && (
                             <div className="space-y-4 animate-in fade-in">
                                 <div className="bg-[#12161D] p-6 rounded-3xl border border-white/5">
@@ -474,23 +640,14 @@
                                 </div>
                             </div>
                         )}
-
-                        {activeTab === 'calc' && (
-                            <div className="space-y-4 animate-in fade-in">
-                                <div className="bg-[#12161D] p-6 rounded-3xl border border-white/5 text-center">
-                                    <h2 className="text-[10px] font-black uppercase tracking-widest text-red-500 mb-4">Kalkulačka 1RM</h2>
-                                    <p className="text-slate-500 text-sm">Coming soon...</p>
-                                </div>
-                            </div>
-                        )}
                     </main>
 
                     <nav className="fixed bottom-6 w-[90%] max-w-md bg-[#12161D]/90 backdrop-blur-xl border border-white/10 p-2 rounded-3xl flex justify-between items-center shadow-2xl z-50">
                         {[
                             { id: 'diary', icon: 'calendar', label: 'Deník' },
                             { id: 'prs', icon: 'award', label: 'Best' },
-                            { id: 'profile', icon: 'user', label: 'Profil' },
-                            { id: 'calc', icon: 'calculator', label: '1RM' }
+                            { id: 'calc', icon: 'calculator', label: '1RM' },
+                            { id: 'profile', icon: 'user', label: 'Profil' }
                         ].map(t => (
                             <button 
                                 key={t.id} 
