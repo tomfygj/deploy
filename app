@@ -61,14 +61,15 @@
             return <i data-lucide={name} className={className} style={{ width: size, height: size }}></i>;
         };
 
-        // Firebase Config - REPLACE WITH YOUR CONFIG
+        // Firebase Config
         const firebaseConfig = {
-            apiKey: "YOUR_API_KEY",
-            authDomain: "YOUR_AUTH_DOMAIN",
-            projectId: "YOUR_PROJECT_ID",
-            storageBucket: "YOUR_STORAGE_BUCKET",
-            messagingSenderId: "YOUR_MESSAGING_SENDER_ID",
-            appId: "YOUR_APP_ID"
+            apiKey: "AIzaSyAtXYwDag14X5YS8GZHV_3zANJxZn6R1nQ",
+            authDomain: "gyme-3b2c0.firebaseapp.com",
+            projectId: "gyme-3b2c0",
+            storageBucket: "gyme-3b2c0.firebasestorage.app",
+            messagingSenderId: "599463828481",
+            appId: "1:599463828481:web:786524ce2d97a10a22f400",
+            measurementId: "G-9XG9WJ9L8S"
         };
 
         if (!firebase.apps.length) {
